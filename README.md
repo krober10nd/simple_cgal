@@ -7,9 +7,9 @@ A simple wrapper to perform 2D/3D Delaunay triangulation using CGAL with pybind1
 3. run: ```pip install simple_cgal```
 
 # Requirements 
-CGAL>=5.0 
-cmake>=2.0
-numpy>=1.0
+1. CGAL>=5.0 
+2. cmake>=2.0
+3. numpy>=1.0
 
 # How does it work?
 
