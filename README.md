@@ -29,7 +29,6 @@ A simple wrapper to perform 2D/3D Delaunay triangulation using CGAL with pybind1
  print('elapsed time is '+str(time.time()-t1))
  
  import matplotlib.pyplot as plt
- faces = numpy.asarray(faces).T
  plt.triplot(points[:,0], points[:,1], faces)
  plt.show()
 ```
