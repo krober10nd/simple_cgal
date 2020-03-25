@@ -11,7 +11,6 @@ message(STATUS "OS detected: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CXX Compiler detected: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMake additional search path for libraries: ${CMAKE_LIBRARY_PATH}")
 
-
 # CGAL and its components
 find_package(CGAL)
 message(STATUS "CGAL version: ${CGAL_VERSION}")
@@ -27,4 +26,4 @@ include( ${CGAL_USE_FILE})
 
 
 add_subdirectory(pybind11)
-pybind11_add_module(simple_cgal src/delaunay2.cpp)
+pybind11_add_module(simple_cgal src/delaunay.cpp)
