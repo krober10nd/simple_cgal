@@ -59,7 +59,7 @@ class CMakeBuild(build_ext):
 setup(
     name='simple_cgal',
     version='0.0.1',
-    author='Keith Roberts',
+    author='Keith Roberts & Guillaume Gay',
     author_email='keithrbt0gmail.com',
     description='A simple wrapper to perform delaunay in cgal with pybind11 and CMake',
     long_description='',
