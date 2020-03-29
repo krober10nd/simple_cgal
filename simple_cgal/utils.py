@@ -1,7 +1,7 @@
 import numpy as np
 
 """
-Basic utilities for parallel Delaunay algorithm.
+Utilities for the parallel Delaunay algorithm.
 """
 
 
@@ -23,11 +23,12 @@ def __sq2(u):
     return __dot2(u, u)
 
 
-def circumballs(points, tri):
+def circumballs(tri):
     """
-    Compute the balls that inscribe the triangles
-    tri must be a instance of a Delaunay triangulation
-    from Scipy.Spatial.Delaunay.
+    Returns the balls that inscribe the triangles
+
+    `tri` must be an instance of a Delaunay triangulation from 
+    Scipy.Spatial.Delaunay. 
     """
 
     p = tri.points[tri.vertices]
@@ -74,8 +75,10 @@ def in_hull(p, hull):
 
 def is_finite(p):
     """
-    A point/site is `finite` when it is not a member of the convex hull
-    of the point set
+    Determine if a point/site is `finite`. A point is finite when it is
+    not a member of the convex hull of the point set
+    
+    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
     """
     isFinite = np.ones((len(p)), dtype=bool)
     isFinite[on_hull(p)] = False
