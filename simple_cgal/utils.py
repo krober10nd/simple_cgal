@@ -5,6 +5,20 @@ Basic utilities for parallel Delaunay algorithm.
 """
 
 
+def intersect_sph_box(ndim, c, r, le, re):
+    """
+    return if a sphere intersects a box
+    """
+    for i in range(ndim):
+        if c[i] < le[i]:
+            if c[i] + r < le[i]:
+                return False
+        elif c[i] > re[i]:
+            if c[i] - r > re[i]:
+                return False
+    return True
+
+
 def __dot2(u, v):
     return u[0] * v[0] + u[1] * v[1]
 
