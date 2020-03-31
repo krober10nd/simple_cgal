@@ -1,10 +1,15 @@
 from .blocker import blocker
-from .utils import intersect_sph_box, is_finite, circumballs, plot_circumballs
+from .utils import (
+    is_finite,
+    calc_circumballs,
+    plot_circumballs,
+    which_intersect,
+)
 
 __all__ = [
     "blocker",
-    "intersect_sph_box",
+    "which_intersect",
     "is_finite",
-    "circumballs",
+    "calc_circumballs",
     "plot_circumballs",
 ]

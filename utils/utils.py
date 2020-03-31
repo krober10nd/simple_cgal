@@ -1,29 +1,41 @@
 import numpy as np
-from numpy.linalg import norm
 
 """
 Utilities for the parallel Delaunay algorithm.
 """
 
 
-def plot_circumballs(points, simplices, cc, rr):
+def which_intersect(block_sets, circumcenters, radii):
     """
-    Visualize circumcircles ontop of the triangulation
+    Returns a list with the block # the circumball intersects with.
+
+    block_sets: a list `len(num_blocks)` containing lists with each blocks'
+                input point coordinates.
+    circumcenters: an ndarray of double `shape(ntrias,ndim)`. Coordinates of
+        the circumcenters.
+    radii: an ndarray of double `shape(ntrias,1)`. Radius of circumcenters.
     """
-    import matplotlib.pyplot as plt
-    import matplotlib.collections
+    num_trias = len(circumcenters)
+    ndim = len(circumcenters[0])
 
-    fig, ax = plt.subplots()
-    plt.triplot(points[:, 0], points[:, 1], simplices.copy(),c='#FFAC67')
-    patches = [plt.Circle(center, size, fill=None) for center, size in zip(cc, rr)]
-    coll = matplotlib.collections.PatchCollection(patches, match_original=True,)
-    ax.add_collection(coll)
-    plt.show()
+    assert num_trias > 0, "too few points"
+    assert ndim > 1 or ndim < 4, "ndim is wrong"
+
+    intersects = np.zeros((num_trias, 5), dtype=int) - 1
+    num_intersects = np.zeros((num_trias, 1), dtype=int)
+    for tria, (cc, rr) in enumerate(zip(circumcenters, radii)):
+        for block_num, block in enumerate(block_sets):
+            le = np.amin(block, axis=0)
+            re = np.amax(block, axis=0)
+            if __do_intersect(ndim, cc, rr, le, re):
+                intersects[tria, num_intersects[tria]] = block_num
+                num_intersects[tria] += 1
+    return num_intersects, intersects
 
 
-def intersect_sph_box(ndim, c, r, le, re):
+def __do_intersect(ndim, c, r, le, re):
     """
-    return if a sphere intersects a box
+    Return if a sphere intersects a box
     """
     for i in range(ndim):
         if c[i] < le[i]:
@@ -35,17 +47,20 @@ def intersect_sph_box(ndim, c, r, le, re):
     return True
 
 
-def circumballs(points, vertices):
+def calc_circumballs(points, vertices):
     """
     Returns the balls that inscribe the triangles defined by points.
 
-    points: an ndarray of double,`shape(npoints,ndim)`. Coordinates of the input points.
-    vertices: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`. Indices of the points forming the simplices in the triangulation. For, 2D the points should be counterclockwise
+    points: an ndarray of double,`shape(npoints,ndim)`. Coordinates of the
+            input points.
+    vertices: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`.
+            Indices of the points forming the simplices in the triangulation.
+            For, 2D the points should be counterclockwise
     """
     num_points, ndim = points.shape
 
     assert num_points > 3, "too few points"
-    assert ndim >= 2 or ndim < 4, "ndim is wrong"
+    assert ndim > 1 or ndim < 4, "ndim is wrong"
 
     p = points[vertices]
 
@@ -55,28 +70,51 @@ def circumballs(points, vertices):
 
     num_trias = len(A.T)
 
-    A = np.append(A, [np.zeros(num_trias)], axis=0)
-    B = np.append(B, [np.zeros(num_trias)], axis=0)
-    C = np.append(C, [np.zeros(num_trias)], axis=0)
+    if ndim < 3:
+        A = np.append(A, [np.zeros(num_trias)], axis=0)
+        B = np.append(B, [np.zeros(num_trias)], axis=0)
+        C = np.append(C, [np.zeros(num_trias)], axis=0)
 
     a = A - C
     b = B - C
+
+    norm = np.linalg.norm
+    cross = np.cross
 
     radii = []
     circumcenters = []
     # https://en.wikipedia.org/wiki/Circumscribed_circle#Circumcircle_equations
     for pa, pb, pc in zip(a.T, b.T, C.T):
         term1 = (norm(pa, 2) ** 2) * pb - (norm(pb, 2) ** 2) * pa
-        term2 = np.cross(pa, pb)
-        term3 = 2 * norm(np.cross(pa, pb)) ** 2
-        circumcenters.append((np.cross(term1, term2) / term3) + pc)
+        term2 = cross(pa, pb)
+        term3 = 2 * norm(cross(pa, pb)) ** 2
+        circumcenters.append((cross(term1, term2) / term3) + pc)
 
         radii.append(
-            (norm(pa, 2) * norm(pb, 2) * norm(pa - pb, 2))
-            / (2 * norm(np.cross(pa, pb)))
+            (norm(pa, 2) * norm(pb, 2) * norm(pa - pb, 2)) / (2 * norm(cross(pa, pb)))
         )
 
+    # delete dummy third dimension
+    if ndim == 2:
+        for ix, row in enumerate(circumcenters):
+            circumcenters[ix] = np.delete(row, 2)
+
     return circumcenters, radii
+
+
+def plot_circumballs(points, simplices, cc, rr):
+    """
+    Visualize circumcircles ontop of the triangulation
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.collections
+
+    fig, ax = plt.subplots()
+    plt.triplot(points[:, 0], points[:, 1], simplices.copy(), c="#FFAC67")
+    patches = [plt.Circle(center, size, fill=None) for center, size in zip(cc, rr)]
+    coll = matplotlib.collections.PatchCollection(patches, match_original=True,)
+    ax.add_collection(coll)
+    plt.show()
 
 
 def on_hull(p):
