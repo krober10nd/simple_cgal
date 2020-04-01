@@ -5,15 +5,31 @@ Utilities for the parallel Delaunay algorithm.
 """
 
 
-def which_intersect(block_sets, circumcenters, radii):
+def enqueue_infinite():
+    """
+    Export infinite points to closest neighboring block.
+    """
+    return 0
+
+
+def enqueue_finite():
+    """
+    Export finite points to blocks that intersects with their circumballs.
+    """
+    return 0
+
+
+def which_intersect(block_sets, circumcenters, radii, rank):
     """
     Returns a list with the block # the circumball intersects with.
+    Ignoring self-intersections.
 
     block_sets: a list `len(num_blocks)` containing lists with each blocks'
                 input point coordinates.
     circumcenters: an ndarray of double `shape(ntrias,ndim)`. Coordinates of
         the circumcenters.
     radii: an ndarray of double `shape(ntrias,1)`. Radius of circumcenters.
+    rank: an int. Represents the owner rank of the block.
     """
     num_trias = len(circumcenters)
     ndim = len(circumcenters[0])
@@ -27,7 +43,7 @@ def which_intersect(block_sets, circumcenters, radii):
         for block_num, block in enumerate(block_sets):
             le = np.amin(block, axis=0)
             re = np.amax(block, axis=0)
-            if __do_intersect(ndim, cc, rr, le, re):
+            if __do_intersect(ndim, cc, rr, le, re) and block_num != rank:
                 intersects[tria, num_intersects[tria]] = block_num
                 num_intersects[tria] += 1
     return num_intersects, intersects
@@ -146,13 +162,14 @@ def in_hull(p, hull):
     return hull.find_simplex(p) >= 0
 
 
-def is_finite(p):
+def are_finite(p):
     """
-    Determine if a point/site is `finite`. A point is finite when it is
+    Determine if a set of points are `finite`.
+    A point is finite when it is
     not a member of the convex hull of the point set
 
     `p` should be a `NxK` coordinates of `N` points in `K` dimensions
     """
-    isFinite = np.ones((len(p)), dtype=bool)
-    isFinite[on_hull(p)] = False
-    return isFinite
+    areFinite = np.ones((len(p)), dtype=bool)
+    areFinite[on_hull(p)] = False
+    return areFinite

@@ -1,6 +1,6 @@
 from .blocker import blocker
 from .utils import (
-    is_finite,
+    are_finite,
     calc_circumballs,
     plot_circumballs,
     which_intersect,
@@ -9,7 +9,7 @@ from .utils import (
 __all__ = [
     "blocker",
     "which_intersect",
-    "is_finite",
+    "are_finite",
     "calc_circumballs",
     "plot_circumballs",
 ]
