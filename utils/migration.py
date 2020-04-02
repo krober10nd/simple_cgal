@@ -8,6 +8,59 @@ Delaunay
 """
 
 
+def enqueue(block_sets, points, faces, rank):
+    """
+    Enqueue sites that are near to block boundaries
+        to any neighbors within circumball radii
+    """
+    return __enqueue(block_sets, points, faces, rank)
+
+
+def __enqueue(block_sets, points, faces, rank):
+    """
+    Return cell sites (vertices of triangulation) to be
+    sent to blocks in `whereTo` that intersects with their circumballs.
+    """
+    import time
+
+    t1 = time.time()
+    cc, rr = utils.calc_circumballs(points, faces)
+    print("Circumball time is " + str(time.time() - t1), flush=True)
+    # calc vertices of each voronoi cell
+    vtoe, nne = utils.vertex_to_elements(faces)
+    ncc = []
+    nrr = []
+    exports = []
+    whereTo = []
+    for cid in range(len(points)):
+        # vertices of voronoi cell
+        vertices = vtoe[0 : nne[cid], cid]
+        for vertex in vertices:
+            ncc.append(cc[vertex])
+            nrr.append(rr[vertex])
+
+    num_intersects, block_nums = utils.simple_which_intersect(
+        block_sets, ncc, nrr, rank
+    )
+    kount2 = 0
+    kount = 0
+    for cid in range(len(points)):
+        tmpWhereTo = []
+        vertices = vtoe[0 : nne[cid], cid]
+        for vertex in vertices:
+            if num_intersects[kount2] > 0:
+                # this cell site should be exported to block #'s in whereTo
+                tmpWhereTo.append(block_nums[kount2])
+            if np.sum(num_intersects[kount2]) > 0:
+                # remove duplicate entries in tmp arrays
+                whereTo = np.unique([[j for j in i if j > -1] for i in tmpWhereTo])
+                exports.append([])
+                exports[kount] = [cid, whereTo]
+                kount += 1
+            kount2 += 1
+    return exports
+
+
 def enqueue_pass1(block_sets, points, faces, rank):
     """
     1. Enqueue finite sites that are near to block boundaries

@@ -8,21 +8,30 @@ from mpi4py import MPI
 import simple_cgal
 import utils
 
+import time
+
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 
 num_blocks = size
-num_points = 10000
+num_points = 100000
 gpoints = np.random.random((num_points, 2))
 
+t1 = time.time()
 block_sets = utils.blocker(gpoints, num_blocks)
+print("block time is ", str(time.time() - t1), flush=True)
 points = block_sets[rank]
+t1 = time.time()
 faces = simple_cgal.delaunay2(points[:, 0], points[:, 1])
-toMigrate = utils.enqueue_pass1(block_sets, points, faces, rank)
+print("tria time is ", str(time.time() - t1), flush=True)
+t1 = time.time()
+toMigrate = utils.enqueue(block_sets, points, faces, rank)
+print("enqueue time is ", str(time.time() - t1), flush=True)
 
+quit()
 # check
-if rank == 3:
+if rank == 0:
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.collections

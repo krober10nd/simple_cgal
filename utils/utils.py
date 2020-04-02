@@ -28,6 +28,34 @@ def vertex_to_elements(faces):
     return vtoe, nne
 
 
+def simple_which_intersect(block_sets, circumcenters, radii, rank):
+    num_trias = len(circumcenters)
+    ndim = len(circumcenters[0])
+
+    intersects = np.zeros((num_trias, 5), dtype=int) - 1
+    num_intersects = np.zeros((num_trias, 1), dtype=int)
+
+    if rank == 0:
+        nei_blocks = [block_sets[rank + 1]]
+    elif rank == len(block_sets) - 1:
+        nei_blocks = [block_sets[rank - 1]]
+    else:
+        nei_blocks = [block_sets[rank - 1], block_sets[rank + 1]]
+
+    le = []
+    re = []
+    for block in nei_blocks:
+        le.append(np.amax(block, axis=0))
+        re.append(np.amax(block, axis=0))
+
+    for tria, (cc, rr) in enumerate(zip(circumcenters, radii)):
+        for block_num, block in enumerate(nei_blocks):
+            if __do_intersect(ndim, cc, rr, le[block_num], re[block_num]):
+                intersects[tria, num_intersects[tria]] = block_num
+                num_intersects[tria] += 1
+    return num_intersects, intersects
+
+
 def which_intersect(block_sets, circumcenters, radii, rank):
     """
     Returns a list with the block # the circumball intersects with.
