@@ -1,10 +1,9 @@
 import numpy as np
-import time
 
 import utils
 
 """
-Migration capabilities for moving points during parallel
+Migration routines for moving points during parallel
 Delaunay
 """
 
@@ -17,13 +16,11 @@ def enqueue_pass1(block_sets, points, faces, rank):
         distance is based on centroid of blocks and point coordinates.
 
     PointsToExport has the form of:
-    points ID, block_i, block_i+1,..., block_n
+        points ID,block_i,block_i+1,...,block_n
     """
     FinitePointsToExport = __enqueue_finite(block_sets, points, faces, rank)
-    # exp_inf_points, whereTo = __enqueue_infinite()
-    # exported = exp_finite_points + exp_inf_points
-    PointsToExport = FinitePointsToExport  # + InfinitePointsToExport
-    return PointsToExport
+    InfinitePointsToExport = __enqueue_infinite_pass1(block_sets, points, rank)
+    return FinitePointsToExport + InfinitePointsToExport
 
 
 def __enqueue_finite(block_sets, points, faces, rank):
@@ -68,8 +65,41 @@ def __enqueue_finite(block_sets, points, faces, rank):
     return exports
 
 
-def __enqueue_infinite():
+def __enqueue_infinite_pass1(block_sets, points, rank):
     """
     Export infinite points to closest neighboring block.
     """
-    return 0
+    # determine which points are infinite
+    areInfiniteCells = np.invert(utils.are_finite(points))
+
+    # calculate centroid of block
+    centroid = []
+    for block in block_sets:
+        le = np.amin(block, axis=0)
+        re = np.amax(block, axis=0)
+        centroid.append((le + re) / 2)
+
+    exports = []
+    # measure distance from block # - 1 and block # + 1
+    ix = 0
+    kount = 0
+    for point, isInfiniteCell in zip(points, areInfiniteCells):
+        if isInfiniteCell:
+            dst1 = np.inf
+            dst2 = np.inf
+            if rank != 0:
+                dst1 = (point[0] - centroid[rank - 1][0]) ** 2 + (
+                    point[1] - centroid[rank - 1][1]
+                ) ** 2
+            if rank != len(block_sets) - 1:
+                dst2 = (point[0] - centroid[rank + 1][0]) ** 2 + (
+                    point[1] - centroid[rank + 1][1]
+                ) ** 2
+            exports.append([])
+            if dst1 < dst2:
+                exports[kount] = [ix, (rank - 1)]
+            else:
+                exports[kount] = [ix, (rank + 1)]
+            kount += 1
+        ix += 1
+    return exports

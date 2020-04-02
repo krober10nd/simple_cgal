@@ -28,8 +28,6 @@ def vertex_to_elements(faces):
     return vtoe, nne
 
 
-
-
 def which_intersect(block_sets, circumcenters, radii, rank):
     """
     Returns a list with the block # the circumball intersects with.
@@ -173,14 +171,14 @@ def in_hull(p, hull):
     return hull.find_simplex(p) >= 0
 
 
-def are_finite(p):
+def are_finite(points):
     """
     Determine if a set of points are `finite`.
     A point is finite when it is
     not a member of the convex hull of the point set
 
-    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
+    `points` should be a `NxK` coordinates of `N` points in `K` dimensions
     """
-    areFinite = np.ones((len(p)), dtype=bool)
-    areFinite[on_hull(p)] = False
+    areFinite = np.ones((len(points)), dtype=bool)
+    areFinite[on_hull(points)] = False
     return areFinite

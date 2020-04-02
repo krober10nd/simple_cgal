@@ -13,7 +13,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 num_blocks = size
-num_points = 100
+num_points = 10000
 gpoints = np.random.random((num_points, 2))
 
 block_sets = utils.blocker(gpoints, num_blocks)
@@ -22,7 +22,7 @@ faces = simple_cgal.delaunay2(points[:, 0], points[:, 1])
 toMigrate = utils.enqueue_pass1(block_sets, points, faces, rank)
 
 # check
-if rank == 0:
+if rank == 3:
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.collections
