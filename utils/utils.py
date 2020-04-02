@@ -5,18 +5,29 @@ Utilities for the parallel Delaunay algorithm.
 """
 
 
-def enqueue_infinite():
+def vertex_to_elements(faces):
     """
-    Export infinite points to closest neighboring block.
+    Returns the elements incident to a vertex in the
+    Delaunay graph.
+
+    faces: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`.
+            Indices of the points forming the simplices in the triangulation.
     """
-    return 0
+    num_points = int(np.amax(faces) + 1)
+    nne = np.zeros((num_points), dtype=int)
+    for face in faces:
+        for vertex in face:
+            nne[vertex] += 1
+    mnz = int(np.amax(nne) + 1)
+    nne.fill(0)
+    vtoe = np.zeros((mnz, num_points), dtype=int)
+    for ie, face in enumerate(faces):
+        for vertex in face:
+            vtoe[nne[vertex], vertex] = ie
+            nne[vertex] += 1
+    return vtoe, nne
 
 
-def enqueue_finite():
-    """
-    Export finite points to blocks that intersects with their circumballs.
-    """
-    return 0
 
 
 def which_intersect(block_sets, circumcenters, radii, rank):

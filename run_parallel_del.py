@@ -1,9 +1,6 @@
 """
 WIP script that will eventually become the
 driver for the parallel delaunay algorithm.
-
-all local quantitis are pre-fixed with l_
-all global quantites are pre-fixed with g_
 """
 import numpy as np
 from mpi4py import MPI
@@ -15,42 +12,36 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 
-g_num_points = 100
-g_num_blocks = size
-g_points = np.random.random((g_num_points, 2))
+num_blocks = size
+num_points = 100
+gpoints = np.random.random((num_points, 2))
 
-# divide all input points into blocks
-g_block_sets = utils.blocker(g_points, g_num_blocks)
-l_points = g_block_sets[rank]
-# compute Delaunay triangulation of input point in block
-l_faces = simple_cgal.delaunay2(l_points[:, 0], l_points[:, 1])
-# compute the circumballs of each triangle in block
-l_cc, l_rr = utils.calc_circumballs(l_points, l_faces)
-# determine which block(s) a circumball intersects with
-l_num_intersects, l_block_nums = utils.which_intersect(g_block_sets, l_cc, l_rr, rank)
-# determine which points are finite (and infinite)
-l_finitePoints = l_points[np.where(utils.are_finite(l_points))]
-l_infinitePoints = l_points[np.where(np.invert(utils.are_finite(l_points)))]
+block_sets = utils.blocker(gpoints, num_blocks)
+points = block_sets[rank]
+faces = simple_cgal.delaunay2(points[:, 0], points[:, 1])
+toMigrate = utils.enqueue_pass1(block_sets, points, faces, rank)
 
-
-import matplotlib.pyplot as plt
-import matplotlib.collections
-import matplotlib.patches as patches
-
+# check
 if rank == 0:
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    import matplotlib.collections
+
     fig, ax = plt.subplots()
-    plt.triplot(l_points[:, 0], l_points[:, 1], l_faces, c="#FFAC67")
-    plt.plot(l_finitePoints[:, 0], l_finitePoints[:, 1], "r.")
-    plt.plot(l_infinitePoints[:, 0], l_infinitePoints[:, 1], "b.")
-    plt.show()
-    quit()
+    plt.plot(points[:, 0], points[:, 1], "r.")
+    plt.triplot(points[:, 0], points[:, 1], faces, color="g")
+    cc, rr = utils.calc_circumballs(points, faces,)
     patches1 = [
-        plt.Circle(center, size, fill=None, color="red")
-        for center, size, block_num in zip(l_cc, l_rr, l_block_nums)
-        if np.any(l_block_num[0] != rank)
+        plt.Circle(center, size, fill=None, color="black")
+        for center, size in zip(cc, rr)
     ]
     coll1 = matplotlib.collections.PatchCollection(patches1, match_original=True,)
     ax.add_collection(coll1)
+
+    for ix in toMigrate:
+        plt.plot(points[ix[0], 0], points[ix[0], 1], "bs")
+        for l in ix[1::]:
+            plt.text(points[ix[0], 0], points[ix[0], 1], str(l))
 
     # plot blocks
     for block in block_sets:
@@ -65,5 +56,4 @@ if rank == 0:
         )
         ax.add_patch(rect)
     ax.set(xlim=(0, 1), ylim=(0, 1))
-
-# plt.show()
+    plt.show()
