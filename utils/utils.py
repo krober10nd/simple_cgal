@@ -11,92 +11,40 @@ Utilities for the parallel Delaunay algorithm.
 def vertex_to_elements(faces):
     """
     Returns the elements incident to a vertex in the
-    Delaunay graph.
+    Delaunay graph. Calls a pybind11 CPP subroutine in src/cpputils.cpp
 
     faces: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`.
             Indices of the points forming the simplices in the triangulation.
     """
-    num_points = np.amax(faces)+1
+    num_points = np.amax(faces) + 1
     num_faces = len(faces)
     vtoe = cutils.vertex_to_elements(faces, num_points, num_faces)
     nne = np.count_nonzero(vtoe, axis=1)
     return vtoe, nne
 
 
-def simple_which_intersect(block_sets, circumcenters, radii, rank):
-    num_trias = len(circumcenters)
-    ndim = len(circumcenters[0])
+def which_intersect(block_sets, circumballs, radii, rank):
+    """
 
-    intersects = np.zeros((num_trias, 5), dtype=int) - 1
-    num_intersects = np.zeros((num_trias, 1), dtype=int)
-
+    """
     if rank == 0:
-        nei_blocks = [block_sets[rank + 1]]
+        nei_blocks = [[-9999, -9999], block_sets[rank + 1]]
     elif rank == len(block_sets) - 1:
-        nei_blocks = [block_sets[rank - 1]]
+        nei_blocks = [block_sets[rank - 1], [-9999, -9999]]
     else:
         nei_blocks = [block_sets[rank - 1], block_sets[rank + 1]]
 
-    le = []
-    re = []
-    for block in nei_blocks:
-        le.append(np.amax(block, axis=0))
-        re.append(np.amax(block, axis=0))
+    le = [np.amin(block, axis=0) for block in nei_blocks]
+    re = [np.amax(block, axis=0) for block in nei_blocks]
 
-    for tria, (cc, rr) in enumerate(zip(circumcenters, radii)):
-        for block_num, block in enumerate(nei_blocks):
-            if __do_intersect(ndim, cc, rr, le[block_num], re[block_num]):
-                intersects[tria, num_intersects[tria]] = block_num
-                num_intersects[tria] += 1
-    return num_intersects, intersects
+    intersect, nIntersect = cutils.sph_bx_intersect(circumballs, radii, le, re)
 
-
-def which_intersect(block_sets, circumcenters, radii, rank):
-    """
-    Returns a list with the block # the circumball intersects with.
-    Ignoring self-intersections.
-
-    block_sets: a list `len(num_blocks)` containing lists with each blocks'
-                input point coordinates.
-    circumcenters: an ndarray of double `shape(ntrias,ndim)`. Coordinates of
-        the circumcenters.
-    radii: an ndarray of double `shape(ntrias,1)`. Radius of circumcenters.
-    rank: an int. Represents the owner rank of the block.
-    """
-    num_trias = len(circumcenters)
-    ndim = len(circumcenters[0])
-
-    assert num_trias > 0, "too few points"
-    assert ndim > 1 or ndim < 4, "ndim is wrong"
-
-    intersects = np.zeros((num_trias, 5), dtype=int) - 1
-    num_intersects = np.zeros((num_trias, 1), dtype=int)
-    for tria, (cc, rr) in enumerate(zip(circumcenters, radii)):
-        for block_num, block in enumerate(block_sets):
-            le = np.amin(block, axis=0)
-            re = np.amax(block, axis=0)
-            if __do_intersect(ndim, cc, rr, le, re) and block_num != rank:
-                intersects[tria, num_intersects[tria]] = block_num
-                num_intersects[tria] += 1
-    return num_intersects, intersects
-
-
-def __do_intersect(ndim, c, r, le, re):
-    """
-    Return if a sphere intersects a box
-    """
-    for i in range(ndim):
-        if c[i] < le[i]:
-            if c[i] + r < le[i]:
-                return False
-        elif c[i] > re[i]:
-            if c[i] - r > re[i]:
-                return False
-    return True
+    return nIntersect, intersect
 
 
 def calc_circumballs(points, vertices):
     """
+    # TODO: convert to CPP
     Returns the balls that inscribe the triangles defined by points.
 
     points: an ndarray of double,`shape(npoints,ndim)`. Coordinates of the
@@ -163,45 +111,3 @@ def plot_circumballs(points, simplices, cc, rr):
     coll = matplotlib.collections.PatchCollection(patches, match_original=True,)
     ax.add_collection(coll)
     plt.show()
-
-
-def on_hull(p):
-    """
-    Return vertices in `p` represeting the convex `hull``
-
-    `p` should be a `NxK` coordinates of `N` points in `K` dimensions.
-    """
-    from scipy.spatial import ConvexHull
-
-    hull = ConvexHull(p)
-    return hull.vertices
-
-
-def in_hull(p, hull):
-    """
-    Test if points in `p` are in `hull`
-
-    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
-    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the
-    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
-    will be computed.
-    """
-    from scipy.spatial import Delaunay
-
-    if not isinstance(hull, Delaunay):
-        hull = Delaunay(hull)
-
-    return hull.find_simplex(p) >= 0
-
-
-def are_finite(points):
-    """
-    Determine if a set of points are `finite`.
-    A point is finite when it is
-    not a member of the convex hull of the point set
-
-    `points` should be a `NxK` coordinates of `N` points in `K` dimensions
-    """
-    areFinite = np.ones((len(points)), dtype=bool)
-    areFinite[on_hull(points)] = False
-    return areFinite

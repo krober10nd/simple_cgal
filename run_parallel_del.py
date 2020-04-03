@@ -20,7 +20,9 @@ gpoints = np.random.random((num_points, 2))
 
 block_sets = utils.blocker(gpoints, num_blocks)
 points = block_sets[rank]
+t1 = time.time()
 faces = simple_cgal.delaunay2(points[:, 0], points[:, 1])
+print(time.time() - t1)
 toMigrate = utils.enqueue(block_sets, points, faces, rank)
 
 quit()
