@@ -134,24 +134,35 @@ def calc_circumballs(points, vertices):
     norm = np.linalg.norm
     cross = np.cross
 
-    radii = []
-    circumcenters = []
     # https://en.wikipedia.org/wiki/Circumscribed_circle#Circumcircle_equations
-    for pa, pb, pc in zip(a.T, b.T, C.T):
-        term1 = (norm(pa, 2) ** 2) * pb - (norm(pb, 2) ** 2) * pa
-        term2 = cross(pa, pb)
-        term3 = 2 * norm(cross(pa, pb)) ** 2
-        circumcenters.append((cross(term1, term2) / term3) + pc)
+    term1_a1 = norm(a.T, 2, axis=1).T ** 2
+    term1_b1 = norm(b.T, 2, axis=1).T ** 2
+    term1 = term1_a1[:, None] * b.T - term1_b1[:, None] * a.T
+    term2 = cross(a.T, b.T, axis=1)
+    term3 = 2 * norm(cross(a.T, b.T, axis=1), 2, axis=1) ** 2
+    term3 = term3[:, None]
+    circumcenters = np.array((cross(term1, term2, axis=1) / term3) + C.T)
 
-        radii.append(
-            (norm(pa, 2) * norm(pb, 2) * norm(pa - pb, 2)) / (2 * norm(cross(pa, pb)))
-        )
+    radii = np.array(
+        (norm(a.T, 2, axis=1).T * norm(b.T, 2, axis=1).T * norm(a.T - b.T, 2, axis=1).T)
+        / (2 * norm(cross(a.T, b.T, axis=1), 2, axis=1).T)
+    )
+    radii = radii[:, None]
+
+    # https://en.wikipedia.org/wiki/Circumscribed_circle#Circumcircle_equations
+    # for pa, pb, pc in zip(a.T, b.T, C.T):
+    #    term1 = (norm(pa, 2) ** 2) * pb - (norm(pb, 2) ** 2) * pa
+    #    term2 = cross(pa, pb)
+    #    term3 = 2 * norm(cross(pa, pb)) ** 2
+    #    circumcenters.append((cross(term1, term2) / term3) + pc)
+
+    #    radii.append(
+    #        (norm(pa, 2) * norm(pb, 2) * norm(pa - pb, 2)) / (2 * norm(cross(pa, pb)))
+    #    )
 
     # delete dummy third dimension
     if ndim == 2:
-        for ix, row in enumerate(circumcenters):
-            circumcenters[ix] = np.delete(row, 2)
-
+        circumcenters = np.delete(circumcenters, 2, 1)
     return circumcenters, radii
 
 
