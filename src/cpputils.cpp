@@ -106,14 +106,11 @@ bool do_intersect2(
         py::array_t<double, py::array::c_style | py::array::forcecast> re
         )
 {
-
   // check input dimensions
   if ( c.ndim() != 1 )
     throw std::runtime_error("Input should be a 1D NumPy array");
-
   if ( le.ndim() != 1 )
     throw std::runtime_error("Input should be a 1D NumPy array");
-
   if ( re.ndim() != 1 )
     throw std::runtime_error("Input should be 1D NumPy array");
 
@@ -145,25 +142,27 @@ std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
                                     std::vector<double> &re) {
 
     std::vector<int> intersects;
-    std::vector<int> nIntersects;
-    intersects.resize(num_points*2);
+    intersects.resize(num_circumballs*2);
 
     for(size_t i=0; i < num_circumballs; i++)
     {
-        // each neighboring block
-        for(size_t j=0; j < 2; i++)
+        // two neighboring blocks: above and below owner
+        for(size_t j=0; j < 2; j++)
         {
-            if c_do_intersect2(
+            if(c_do_intersect2(
                     circumballs[i*2],
                     radii[i],
                     le[j*2],
                     re[j*2])
+              )
                 {
-                // intersects has 0 for block below
+                // 0 for block below
                 // and 1 for block above
                 intersects[i*2 + j] = j;
                 }
-
+            else {
+                intersects[i*2 + j] = -1;
+            }
         }
     }
     return intersects;
@@ -175,43 +174,56 @@ std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
 // ----------------
 
 std::vector<int> sph_bx_intersect2(
-        py::array_t<double, py::array::c_style | py::array::forcecast> c,
-        double r,
-        py::array_t<double, py::array::c_style | py::array::forcecast> le,
-        py::array_t<double, py::array::c_style | py::array::forcecast> re
+            int num_circumballs,
+            py::array_t<double, py::array::c_style | py::array::forcecast> circumballs,
+            py::array_t<double, py::array::c_style | py::array::forcecast> radii,
+            py::array_t<double, py::array::c_style | py::array::forcecast> le,
+            py::array_t<double, py::array::c_style | py::array::forcecast> re,
         )
 {
-
   // check input dimensions
-  if ( c.ndim() != 1 )
-    throw std::runtime_error("Input should be a 1D NumPy array");
-
+  if ( circumballs.ndim() != 2 )
+    throw std::runtime_error("Circumballs should be a 2D NumPy array");
+  if ( radii.ndim() != 1 )
+    throw std::runtime_error("Radii should be a 1D NumPy array");
   if ( le.ndim() != 1 )
-    throw std::runtime_error("Input should be a 1D NumPy array");
-
+    throw std::runtime_error("le should be a 1D NumPy array");
   if ( re.ndim() != 1 )
-    throw std::runtime_error("Input should be 1D NumPy array");
+    throw std::runtime_error("re should be 1D NumPy array");
 
   // allocate std::vector (to pass to the C++ function)
-  std::vector<double> cppC(2);
-  std::vector<double> cppLE(2);
-  std::vector<double> cppRE(2);
-  double cppR;
+  std::vector<double> cppCC(num_circumballs,2);
+  std::vector<double> cppRR(num_circumballs,1);
+  std::vector<double> cppLE(4);
+  std::vector<double> cppRE(4);
 
   // copy py::array -> std::vector
-  std::memcpy(cppLE.data(),re.data(),2*sizeof(double));
-  std::memcpy(cppRE.data(),le.data(),2*sizeof(double));
-  std::memcpy(cppC.data(),c.data(),2*sizeof(double));
-  cppR = r;
+  std::memcpy(cppLE.data(),re.data(),4*sizeof(double));
+  std::memcpy(cppRE.data(),le.data(),4*sizeof(double));
+  std::memcpy(cppCC.data(),circumballs.data(),num_circumballs*2*sizeof(double));
+  std::memcpy(cppRR.data(),radii.data(),num_circumballs*sizeof(double));
 
-  intersect = c_sph_box_intersect2(cppC, cppR, cppLE, cppRE);
+  std::vector<int> intersect = c_sph_bx_intersect2(num_circumballs, cppCC, cppRR, cppLE, cppRE);
 
-  // return result
-  return do_intersect;
+  ssize_t              soint      = sizeof(int);
+  ssize_t              ndim      = 2;
+  std::vector<ssize_t> shape     = {num_circumballs, 2};
+  std::vector<ssize_t> strides   = {soint*2, soint};
+
+  // return 2-D NumPy array
+  return py::array(py::buffer_info(
+    intersect.data(),                           /* data as contiguous array  */
+    sizeof(int),                          /* size of one scalar        */
+    py::format_descriptor<int>::format(), /* data type                 */
+    2,                                    /* number of dimensions      */
+    shape,                                   /* shape of the matrix       */
+    strides                                  /* strides for each axis     */
+  ));
 }
 
 
 PYBIND11_MODULE(cpputils, m) {
     m.def("vertex_to_elements", &vertex_to_elements);
     m.def("do_intersect", &do_intersect2);
+    m.def("sph_bx_intersect2", &sph_bx_intersect2);
 }

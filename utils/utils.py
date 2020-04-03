@@ -25,21 +25,24 @@ def vertex_to_elements(faces):
 
 def which_intersect(block_sets, circumballs, radii, rank):
     """
+    Returns the block # each circumcircle intersects with.
+    0 for block below, 1 for block above. If -1, circle does
+    intersect neighboring block.
 
     """
     if rank == 0:
-        nei_blocks = [[-9999, -9999], block_sets[rank + 1]]
+        nei_blocks = [[-9999, -9899], block_sets[rank + 1]]
     elif rank == len(block_sets) - 1:
-        nei_blocks = [block_sets[rank - 1], [-9999, -9999]]
+        nei_blocks = [block_sets[rank - 1], [-9999, -9899]]
     else:
         nei_blocks = [block_sets[rank - 1], block_sets[rank + 1]]
 
     le = [np.amin(block, axis=0) for block in nei_blocks]
     re = [np.amax(block, axis=0) for block in nei_blocks]
 
-    intersect, nIntersect = cutils.sph_bx_intersect(circumballs, radii, le, re)
+    intersect = cutils.sph_bx_intersect2(circumballs, radii, le, re)
 
-    return nIntersect, intersect
+    return intersect
 
 
 def calc_circumballs(points, vertices):
