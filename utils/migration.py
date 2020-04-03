@@ -25,8 +25,8 @@ def __enqueue(block_sets, points, faces, rank):
 
     t1 = time.time()
     cc, rr = utils.calc_circumballs(points, faces)
-    print("Circumball time is " + str(time.time() - t1), flush=True)
     # calc vertices of each voronoi cell
+    t1 = time.time()
     vtoe, nne = utils.vertex_to_elements(faces)
     ncc = []
     nrr = []
@@ -34,19 +34,23 @@ def __enqueue(block_sets, points, faces, rank):
     whereTo = []
     for cid in range(len(points)):
         # vertices of voronoi cell
-        vertices = vtoe[0 : nne[cid], cid]
+        vertices = vtoe[cid, 0 : nne[cid]]
         for vertex in vertices:
             ncc.append(cc[vertex])
             nrr.append(rr[vertex])
 
+    t1 = time.time()
     num_intersects, block_nums = utils.simple_which_intersect(
         block_sets, ncc, nrr, rank
     )
+    print("Intersect time is " + str(time.time() - t1), flush=True)
+
+    t1 = time.time()
     kount2 = 0
     kount = 0
     for cid in range(len(points)):
         tmpWhereTo = []
-        vertices = vtoe[0 : nne[cid], cid]
+        vertices = vtoe[cid, 0 : nne[cid]]
         for vertex in vertices:
             if num_intersects[kount2] > 0:
                 # this cell site should be exported to block #'s in whereTo
@@ -58,6 +62,7 @@ def __enqueue(block_sets, points, faces, rank):
                 exports[kount] = [cid, whereTo]
                 kount += 1
             kount2 += 1
+    print("Loading time is " + str(time.time() - t1), flush=True)
     return exports
 
 
@@ -92,7 +97,7 @@ def __enqueue_finite(block_sets, points, faces, rank):
     for cid in range(len(points)):
         if areFiniteCells[cid]:
             # vertices of voronoi cell
-            vertices = vtoe[0 : nne[cid], cid]
+            vertices = vtoe[cid, 0 : nne[cid]]
             for vertex in vertices:
                 ncc.append(cc[vertex])
                 nrr.append(rr[vertex])
@@ -103,7 +108,7 @@ def __enqueue_finite(block_sets, points, faces, rank):
     for cid in range(len(points)):
         if areFiniteCells[cid]:
             tmpWhereTo = []
-            vertices = vtoe[0 : nne[cid], cid]
+            vertices = vtoe[cid, 0 : nne[cid]]
             for vertex in vertices:
                 if num_intersects[kount2] > 0:
                     # this cell site should be exported to block #'s in whereTo

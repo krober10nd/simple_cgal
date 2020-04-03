@@ -27,3 +27,4 @@ include( ${CGAL_USE_FILE})
 
 add_subdirectory(pybind11)
 pybind11_add_module(simple_cgal src/delaunay.cpp)
+pybind11_add_module(cpputils src/cpputils.cpp)

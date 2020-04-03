@@ -1,5 +1,8 @@
 import numpy as np
 
+import cpputils as cutils
+
+
 """
 Utilities for the parallel Delaunay algorithm.
 """
@@ -13,18 +16,10 @@ def vertex_to_elements(faces):
     faces: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`.
             Indices of the points forming the simplices in the triangulation.
     """
-    num_points = int(np.amax(faces) + 1)
-    nne = np.zeros((num_points), dtype=int)
-    for face in faces:
-        for vertex in face:
-            nne[vertex] += 1
-    mnz = int(np.amax(nne) + 1)
-    nne.fill(0)
-    vtoe = np.zeros((mnz, num_points), dtype=int)
-    for ie, face in enumerate(faces):
-        for vertex in face:
-            vtoe[nne[vertex], vertex] = ie
-            nne[vertex] += 1
+    num_points = np.amax(faces)+1
+    num_faces = len(faces)
+    vtoe = cutils.vertex_to_elements(faces, num_points, num_faces)
+    nne = np.count_nonzero(vtoe, axis=1)
     return vtoe, nne
 
 
@@ -148,17 +143,6 @@ def calc_circumballs(points, vertices):
         / (2 * norm(cross(a.T, b.T, axis=1), 2, axis=1).T)
     )
     radii = radii[:, None]
-
-    # https://en.wikipedia.org/wiki/Circumscribed_circle#Circumcircle_equations
-    # for pa, pb, pc in zip(a.T, b.T, C.T):
-    #    term1 = (norm(pa, 2) ** 2) * pb - (norm(pb, 2) ** 2) * pa
-    #    term2 = cross(pa, pb)
-    #    term3 = 2 * norm(cross(pa, pb)) ** 2
-    #    circumcenters.append((cross(term1, term2) / term3) + pc)
-
-    #    radii.append(
-    #        (norm(pa, 2) * norm(pb, 2) * norm(pa - pb, 2)) / (2 * norm(cross(pa, pb)))
-    #    )
 
     # delete dummy third dimension
     if ndim == 2:

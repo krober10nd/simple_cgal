@@ -18,16 +18,10 @@ num_blocks = size
 num_points = 100000
 gpoints = np.random.random((num_points, 2))
 
-t1 = time.time()
 block_sets = utils.blocker(gpoints, num_blocks)
-print("block time is ", str(time.time() - t1), flush=True)
 points = block_sets[rank]
-t1 = time.time()
 faces = simple_cgal.delaunay2(points[:, 0], points[:, 1])
-print("tria time is ", str(time.time() - t1), flush=True)
-t1 = time.time()
 toMigrate = utils.enqueue(block_sets, points, faces, rank)
-print("enqueue time is ", str(time.time() - t1), flush=True)
 
 quit()
 # check
