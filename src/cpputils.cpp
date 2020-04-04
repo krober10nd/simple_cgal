@@ -136,30 +136,30 @@ bool do_intersect2(
 
 
 
-std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
-                                    std::vector<double> &circumballs,
+std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
                                     std::vector<double> &radii,
                                     std::vector<double> &le,
                                     std::vector<double> &re) {
 
+    int num_circumcenters = circumcenters.size()/2;
     std::vector<int> intersects;
-    intersects.resize(num_circumballs*2);
+    intersects.resize(num_circumcenters*2);
 
-    for(std::size_t i=0; i < num_circumballs; i++)
+    for(std::size_t i=0; i < num_circumcenters; ++i)
     {
         // two neighboring blocks: below and above (in this order)
-        for(std::size_t j=0; j < 2; j++)
+        for(std::size_t j=0; j < 2; ++j)
         {
             bool do_intersect = true;
             // loop over dimensions
             for(std::size_t n =0; n < 2; n++) {
-                if(circumballs[2*i + n] < le[j*2 + n]){
-                    if(circumballs[2*i + n] + radii[i] < le[j*2 + n]){
+                if(circumcenters[2*i + n] < le[j*2 + n]){
+                    if(circumcenters[2*i + n] + radii[i] < le[j*2 + n]){
                         do_intersect=false;
                     }
                 }
-                else if(circumballs[2*i + n] > re[j*2 + n]) {
-                    if(circumballs[2*i + n] - radii[i] > re[j*2 + n]){
+                else if(circumcenters[2*i + n] > re[j*2 + n]) {
+                    if(circumcenters[2*i + n] - radii[i] > re[j*2 + n]){
                         do_intersect=false;
                     }
                 }
@@ -183,39 +183,31 @@ std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
 // ----------------
 
  py::array sph_bx_intersect2(
-            int num_circumballs,
-            py::array_t<double, py::array::c_style | py::array::forcecast> circumballs,
+            py::array_t<double, py::array::c_style | py::array::forcecast> circumcenters,
             py::array_t<double, py::array::c_style | py::array::forcecast> radii,
             py::array_t<double, py::array::c_style | py::array::forcecast> le,
             py::array_t<double, py::array::c_style | py::array::forcecast> re)
 {
-  // check input dimensions
-  if ( circumballs.ndim() != 2 )
-    throw std::runtime_error("Circumballs should be a 2D NumPy array");
-  if ( radii.ndim() != 2 )
-    throw std::runtime_error("Radii should be a 2D NumPy array");
-  if ( le.ndim() != 2 )
-    throw std::runtime_error("le should be a 2D NumPy array");
-  if ( re.ndim() != 2 )
-    throw std::runtime_error("re should be 2D NumPy array");
+  int num_circumcenters = circumcenters.size();
 
   // allocate std::vector (to pass to the C++ function)
-  std::vector<double> cppCC(num_circumballs,2);
-  std::vector<double> cppRR(num_circumballs,1);
+  std::vector<double> cppCC(num_circumcenters*2);
+  std::vector<double> cppRR(num_circumcenters);
   std::vector<double> cppLE(4);
   std::vector<double> cppRE(4);
 
   // copy py::array -> std::vector
   std::memcpy(cppLE.data(),re.data(),4*sizeof(double));
   std::memcpy(cppRE.data(),le.data(),4*sizeof(double));
-  std::memcpy(cppCC.data(),circumballs.data(),num_circumballs*2*sizeof(double));
-  std::memcpy(cppRR.data(),radii.data(),num_circumballs*sizeof(double));
+  std::memcpy(cppCC.data(),circumcenters.data(),num_circumcenters*2*sizeof(double));
+  std::memcpy(cppRR.data(),radii.data(),num_circumcenters*sizeof(double));
 
-  std::vector<int> intersect = c_sph_bx_intersect2(num_circumballs, cppCC, cppRR, cppLE, cppRE);
+  std::cout<<"past2 here" << std::endl;
+  std::vector<int> intersect = c_sph_bx_intersect2(cppCC, cppRR, cppLE, cppRE);
 
   ssize_t              soint      = sizeof(int);
   ssize_t              ndim      = 2;
-  std::vector<ssize_t> shape     = {num_circumballs, 2};
+  std::vector<ssize_t> shape     = {num_circumcenters, 2};
   std::vector<ssize_t> strides   = {soint*2, soint};
 
   // return 2-D NumPy array

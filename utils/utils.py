@@ -31,7 +31,6 @@ def which_intersect(block_sets, circumcenters, radii, rank):
     intersect neighboring block.
 
     """
-    num_cc = int(len(circumcenters))
     if rank == 0:
         nei_blocks = [block_sets[rank + 1]]
     elif rank == len(block_sets) - 1:
@@ -39,10 +38,15 @@ def which_intersect(block_sets, circumcenters, radii, rank):
     else:
         nei_blocks = [block_sets[rank - 1], block_sets[rank + 1]]
 
-    le = np.array([np.amin(block, axis=0) for block in nei_blocks])
-    re = np.array([np.amax(block, axis=0) for block in nei_blocks])
+    le = np.array([np.amin(block, axis=0) for block in nei_blocks]).flatten()
+    re = np.array([np.amax(block, axis=0) for block in nei_blocks]).flatten()
 
-    intersect = cutils.sph_bx_intersect2(num_cc, circumcenters, radii, le, re)
+    # add dummy box if rank==0 or rank=size-1
+    if len(le) == 2:
+        le = np.append(le, [-9999, -9999])
+        re = np.append(re, [-9998, -9998])
+
+    intersect = cutils.sph_bx_intersect2(circumcenters, radii, le, re)
 
     return intersect
 

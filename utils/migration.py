@@ -18,6 +18,8 @@ def enqueue(block_sets, points, faces, rank):
     t1 = time.time()
     blockNums = utils.which_intersect(block_sets, cc, rr, rank)
     print("Intersect time is " + str(time.time() - t1), flush=True)
+    for num in blockNums:
+        print(num)
     # now go through each voronoi cell
     exports = []
     return exports
