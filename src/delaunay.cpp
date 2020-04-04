@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <vector>
 
+#include <CGAL/Kernel/global_functions.h>
+
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
@@ -15,6 +17,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
+
 
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel            Kernel;
@@ -27,6 +30,33 @@ typedef CGAL::Triangulation_vertex_base_with_info_3<unsigned int, Kernel> Vb3;
 typedef CGAL::Triangulation_data_structure_3<Vb3>                       Tds3;
 typedef CGAL::Delaunay_triangulation_3<Kernel, Tds3>                    Delaunay3;
 typedef Kernel::Point_3 Point3;
+
+
+
+std::vector<double> c_circumballs2(std::vector<double> &vertices)
+{
+    int num_faces = vertices.size()/6;
+    std::vector<double> circumcenters;
+    for(std::size_t i=0; i < num_faces; ++i)
+    {
+        Point tmp_cc =
+                CGAL::circumcenter(
+                Point(vertices[i*6],vertices[i*6+1]),
+                Point(vertices[i*6+2],vertices[i*6+3]),
+                Point(vertices[i*6+4],vertices[i*6+5])
+                );
+        circumcenters.push_back(tmp_cc.x());
+        circumcenters.push_back(tmp_cc.y());
+        circumcenters.push_back(
+                CGAL::squared_radius(
+                    Point(vertices[i*6],vertices[i*6+1]),
+                    Point(vertices[i*6+2],vertices[i*6+3]),
+                    Point(vertices[i*6+4],vertices[i*6+5])
+                    )
+                );
+    }
+    return circumcenters;
+}
 
 
 std::vector<int> c_delaunay2(std::vector<double> &x, std::vector<double> &y)
@@ -103,6 +133,29 @@ std::vector<int> c_delaunay3(std::vector<double> &x, std::vector<double> &y, std
 // (from https://github.com/tdegeus/pybind11_examples/blob/master/04_numpy-2D_cpp-vector/example.cpp)
 
 namespace py = pybind11;
+py::array circumballs2(py::array_t<double, py::array::c_style | py::array::forcecast> vertices)
+{
+    // each triangle has 3 vertices with 2 coordinates each
+    int sz = vertices.shape()[0];
+    std::vector<double> cppvertices(sz);
+    std::memcpy(cppvertices.data(),vertices.data(),sz*sizeof(double));
+    std::vector<double> circumcenters = c_circumballs2(cppvertices);
+    ssize_t              soreal      = sizeof(double);
+    ssize_t              num_points = circumcenters.size()/3;
+    ssize_t              ndim      = 2;
+    std::vector<ssize_t> shape     = {num_points, 3};
+    std::vector<ssize_t> strides   = {soreal*3, soreal};
+    // return 2-D NumPy array
+    return py::array(py::buffer_info(
+        circumcenters.data(),                    /* data as contiguous array  */
+        sizeof(double),                          /* size of one scalar        */
+        py::format_descriptor<double>::format(), /* data type                 */
+        2,                                       /* number of dimensions      */
+        shape,                                   /* shape of the matrix       */
+        strides                                  /* strides for each axis     */
+  ));
+}
+
 py::array delaunay2(py::array_t<double, py::array::c_style | py::array::forcecast> x,
                     py::array_t<double, py::array::c_style | py::array::forcecast> y)
 {
@@ -188,6 +241,7 @@ py::array delaunay3(py::array_t<double, py::array::c_style | py::array::forcecas
 
 
 PYBIND11_MODULE(simple_cgal, m) {
+    m.def("circumballs2", &circumballs2);
     m.def("delaunay2", &delaunay2);
     m.def("delaunay3", &delaunay3);
 }

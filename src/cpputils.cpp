@@ -8,6 +8,7 @@
 
 
 
+
 std::vector<int> c_vertex_to_elements(std::vector<int> &faces, int &num_points, int &num_faces)
 {
     std::vector<int> vtoe;
@@ -15,8 +16,8 @@ std::vector<int> c_vertex_to_elements(std::vector<int> &faces, int &num_points, 
     // assume each vertex has a max. of 20 elements neigh.
     vtoe.resize(num_points*20);
     nne.resize(num_points);
-    for(size_t ie = 0; ie < num_faces; ie++ ) {
-        for(size_t iv =0; iv < 3; iv++ ) {
+    for(std::size_t ie = 0; ie < num_faces; ie++ ) {
+        for(std::size_t iv =0; iv < 3; iv++ ) {
             int nm1 = faces[ie*3+iv];
             vtoe[nm1*20 + nne[nm1]] = ie;
             nne[nm1] += 1;
@@ -77,7 +78,7 @@ py::array vertex_to_elements(py::array_t<int, py::array::c_style | py::array::fo
 bool c_do_intersect2(std::vector<double> &c, double &r,
         std::vector<double> &le, std::vector<double> &re) {
 
-    for(size_t i =0; i < 2; i++) {
+    for(std::size_t i =0; i < 2; i++) {
         if(c[i] < le[i]){
             if(c[i] + r < le[i]){
                 return false;
@@ -144,18 +145,26 @@ std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
     std::vector<int> intersects;
     intersects.resize(num_circumballs*2);
 
-    for(size_t i=0; i < num_circumballs; i++)
+    for(std::size_t i=0; i < num_circumballs; i++)
     {
-        // two neighboring blocks: above and below owner
-        for(size_t j=0; j < 2; j++)
+        // two neighboring blocks: below and above (in this order)
+        for(std::size_t j=0; j < 2; j++)
         {
-            if(c_do_intersect2(
-                    circumballs[i*2],
-                    radii[i],
-                    le[j*2],
-                    re[j*2])
-              )
-                {
+            bool do_intersect = true;
+            // loop over dimensions
+            for(std::size_t n =0; n < 2; n++) {
+                if(circumballs[2*i + n] < le[j*2 + n]){
+                    if(circumballs[2*i + n] + radii[i] < le[j*2 + n]){
+                        do_intersect=false;
+                    }
+                }
+                else if(circumballs[2*i + n] > re[j*2 + n]) {
+                    if(circumballs[2*i + n] - radii[i] > re[j*2 + n]){
+                        do_intersect=false;
+                    }
+                }
+            }
+            if(do_intersect) {
                 // 0 for block below
                 // and 1 for block above
                 intersects[i*2 + j] = j;
@@ -173,23 +182,22 @@ std::vector<int> c_sph_bx_intersect2(int &num_circumballs,
 // Python interface for c_sph_bx_intersect2
 // ----------------
 
-std::vector<int> sph_bx_intersect2(
+ py::array sph_bx_intersect2(
             int num_circumballs,
             py::array_t<double, py::array::c_style | py::array::forcecast> circumballs,
             py::array_t<double, py::array::c_style | py::array::forcecast> radii,
             py::array_t<double, py::array::c_style | py::array::forcecast> le,
-            py::array_t<double, py::array::c_style | py::array::forcecast> re,
-        )
+            py::array_t<double, py::array::c_style | py::array::forcecast> re)
 {
   // check input dimensions
   if ( circumballs.ndim() != 2 )
     throw std::runtime_error("Circumballs should be a 2D NumPy array");
-  if ( radii.ndim() != 1 )
-    throw std::runtime_error("Radii should be a 1D NumPy array");
-  if ( le.ndim() != 1 )
-    throw std::runtime_error("le should be a 1D NumPy array");
-  if ( re.ndim() != 1 )
-    throw std::runtime_error("re should be 1D NumPy array");
+  if ( radii.ndim() != 2 )
+    throw std::runtime_error("Radii should be a 2D NumPy array");
+  if ( le.ndim() != 2 )
+    throw std::runtime_error("le should be a 2D NumPy array");
+  if ( re.ndim() != 2 )
+    throw std::runtime_error("re should be 2D NumPy array");
 
   // allocate std::vector (to pass to the C++ function)
   std::vector<double> cppCC(num_circumballs,2);
