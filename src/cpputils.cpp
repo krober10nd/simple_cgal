@@ -188,10 +188,10 @@ std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
             py::array_t<double, py::array::c_style | py::array::forcecast> le,
             py::array_t<double, py::array::c_style | py::array::forcecast> re)
 {
-  int num_circumcenters = circumcenters.size();
+  int num_circumcenters = radii.size();
 
   // allocate std::vector (to pass to the C++ function)
-  std::vector<double> cppCC(num_circumcenters*2);
+  std::vector<double> cppCC(2*num_circumcenters);
   std::vector<double> cppRR(num_circumcenters);
   std::vector<double> cppLE(4);
   std::vector<double> cppRE(4);
@@ -202,7 +202,6 @@ std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
   std::memcpy(cppCC.data(),circumcenters.data(),num_circumcenters*2*sizeof(double));
   std::memcpy(cppRR.data(),radii.data(),num_circumcenters*sizeof(double));
 
-  std::cout<<"past2 here" << std::endl;
   std::vector<int> intersect = c_sph_bx_intersect2(cppCC, cppRR, cppLE, cppRE);
 
   ssize_t              soint      = sizeof(int);
