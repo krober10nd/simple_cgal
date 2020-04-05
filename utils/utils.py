@@ -44,6 +44,7 @@ def which_intersect(block_sets, circumcenters, radii, rank):
     # add dummy box if rank==0 or rank=size-1
     if len(le) == 2:
         le = np.append(le, [-9999, -9999])
+    if len(re) == 2:
         re = np.append(re, [-9998, -9998])
 
     intersect = cutils.sph_bx_intersect2(circumcenters, radii, le, re)

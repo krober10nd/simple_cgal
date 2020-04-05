@@ -1,8 +1,7 @@
 import utils
 
 """
-Migration routines for moving points during parallel
-Delaunay
+Migration routines for moving points during parallel Delaunay
 """
 
 

@@ -141,7 +141,7 @@ std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
                                     std::vector<double> &le,
                                     std::vector<double> &re) {
 
-    int num_circumcenters = circumcenters.size()/2;
+    int num_circumcenters = radii.size();
     std::vector<int> intersects;
     intersects.resize(num_circumcenters*2);
 
@@ -154,12 +154,12 @@ std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
             // loop over dimensions
             for(std::size_t n =0; n < 2; n++) {
                 if(circumcenters[2*i + n] < le[j*2 + n]){
-                    if(circumcenters[2*i + n] + radii[i] < le[j*2 + n]){
+                    if((circumcenters[2*i + n] + radii[i]) < le[j*2 + n]){
                         do_intersect=false;
                     }
                 }
                 else if(circumcenters[2*i + n] > re[j*2 + n]) {
-                    if(circumcenters[2*i + n] - radii[i] > re[j*2 + n]){
+                    if((circumcenters[2*i + n] - radii[i]) > re[j*2 + n]){
                         do_intersect=false;
                     }
                 }
@@ -197,8 +197,8 @@ std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
   std::vector<double> cppRE(4);
 
   // copy py::array -> std::vector
-  std::memcpy(cppLE.data(),re.data(),4*sizeof(double));
-  std::memcpy(cppRE.data(),le.data(),4*sizeof(double));
+  std::memcpy(cppRE.data(),re.data(),4*sizeof(double));
+  std::memcpy(cppLE.data(),le.data(),4*sizeof(double));
   std::memcpy(cppCC.data(),circumcenters.data(),num_circumcenters*2*sizeof(double));
   std::memcpy(cppRR.data(),radii.data(),num_circumcenters*sizeof(double));
 
