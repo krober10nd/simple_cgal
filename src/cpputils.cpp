@@ -3,20 +3,162 @@
 #include <pybind11/complex.h>
 #include <pybind11/numpy.h>
 
+#include <CGAL/Kernel/global_functions.h>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Iso_rectangle_2.h>
+#include <CGAL/Circle_2.h>
+#include <CGAL/intersections.h>
+
 #include <assert.h>
 #include <vector>
 
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef K::Point_2 Point;
+typedef K::Circle_2  Circle;
+typedef K::Iso_rectangle_2 Rectangle;
+
+// determine which rank points need to be exported to
+std::vector<int> c_where_to2(std::vector<double> &points, std::vector<int> &faces,
+                             std::vector<double> &llc, std::vector<double> &urc)
+{
+    int num_faces = faces.size()/3;
+    int num_points = points.size()/2;
+
+    // Step 1. Determine all elements connected to each point in points.
+    std::vector<int> vtoe;
+    std::vector<int> nne;
+    // assume each vertex has a max. of 20 elements neigh.
+    vtoe.resize(num_points*20, -1);
+    nne.resize(num_points, 0);
+    for(std::size_t ie = 0; ie < num_faces; ++ie ) {
+        for(std::size_t iv =0; iv < 3; ++iv ) {
+            int nm1 = faces[ie*3+iv];
+            vtoe[nm1*20 + nne[nm1]] = ie;
+            nne[nm1] += 1;
+            }
+        }
+    // Step 2. Determine which rank to send the vertex (exports)
+    // exports[iv] is either 0 or 1 (0 for block owned by rank-1 and 1 for block owned by rank+1)
+    std::vector<int> exports;
+    exports.resize(num_points,-1);
+    // For each point in points
+    for(std::size_t iv=0; iv < num_points; ++iv)
+    {
+        // For all connected elements to point iv
+        for(std::size_t ic=0; ic < nne[iv]; ++ic)
+        {
+            int nei_ele = vtoe[iv*20 + ic];
+            // Indices of element into points
+            int nm1 = faces[nei_ele*3];
+            int nm2 = faces[nei_ele*3+1];
+            int nm3 = faces[nei_ele*3+2];
+            // Coordinates of each vertex of element
+            Point pnm1 = Point(points[nm1*2], points[nm1*2+1]);
+            Point pnm2 = Point(points[nm2*2], points[nm2*2+1]);
+            Point pnm3 = Point(points[nm3*2], points[nm3*2+1]);
+            // Calculate circumball of element
+            Point cc = CGAL::circumcenter(pnm1, pnm2, pnm3);
+            double sqr_radius = CGAL::squared_radius(pnm1, pnm2, pnm3);
+            Circle circ = Circle(cc, sqr_radius, CGAL::CLOCKWISE);
+            // Does this circumball intersect with box above or box below?
+            for(std::size_t bx=0; bx< 2; ++bx ){
+                Rectangle rect = Rectangle(Point(llc[bx*2], llc[bx*2 +1]),
+                        Point(urc[bx*2], urc[bx*2+1]));
+                bool intersects = CGAL::do_intersect(circ, rect);
+                if(intersects){
+                    exports[iv] = bx;
+                }
+            }
+        }
+    }
+    return exports;
+}
+
+namespace py = pybind11;
+// ----------------
+// Python interface for c_where_to2
+// ----------------
+py::array where_to2(py::array_t<double, py::array::c_style | py::array::forcecast> points,
+                    py::array_t<int, py::array::c_style | py::array::forcecast> faces,
+                    py::array_t<double, py::array::c_style | py::array::forcecast> llc,
+                    py::array_t<double, py::array::c_style | py::array::forcecast> urc
+                    )
+{
+  int num_faces = faces.size()/3;
+  int num_points = points.size()/2;
+
+  // allocate std::vector (to pass to the C++ function)
+  std::vector<double> cpppoints(num_points*2);
+  std::vector<int> cppfaces(num_faces*3);
+  std::vector<double> cppllc(4);
+  std::vector<double> cppurc(4);
+
+  // copy py::array -> std::vector
+  std::memcpy(cpppoints.data(),points.data(),num_points*2*sizeof(double));
+  std::memcpy(cppfaces.data(),faces.data(),num_faces*3*sizeof(int));
+  std::memcpy(cppllc.data(), llc.data(),4*sizeof(double));
+  std::memcpy(cppurc.data(), urc.data(),4*sizeof(double));
+
+  // call cpp code
+  std::vector<int> exports = c_where_to2(cpppoints, cppfaces, cppllc, cppurc);
+
+  ssize_t              soint      = sizeof(int);
+  ssize_t              ndim      = 2;
+  std::vector<ssize_t> shape     = {num_points, 1};
+  std::vector<ssize_t> strides   = {soint*1, soint};
+
+  // return 2-D NumPy array
+  return py::array(py::buffer_info(
+    exports.data(),                           /* data as contiguous array  */
+    sizeof(int),                          /* size of one scalar        */
+    py::format_descriptor<int>::format(), /* data type                 */
+    2,                                    /* number of dimensions      */
+    shape,                                   /* shape of the matrix       */
+    strides                                  /* strides for each axis     */
+  ));
+}
 
 
+// Does a circle intersect with a rectangle?
+bool c_do_intersect2(std::vector<double> &center, double radius, std::vector<double> &llc, std::vector<double> &urc )
+{
+  double sqr_r1 = radius*radius;
+  Circle circ1 = Circle(Point(center[0],center[1]), sqr_r1, CGAL::CLOCKWISE);
+  Rectangle rect1 = Rectangle(Point(llc[0], llc[1]), Point(urc[0], urc[1]));
+  return CGAL::do_intersect(circ1, rect1);
+}
+
+// ----------------
+// Python interface for do_intersect2
+// ----------------
+bool do_intersect2(
+        py::array_t<double, py::array::c_style | py::array::forcecast> center,
+        double radius,
+        py::array_t<double, py::array::c_style | py::array::forcecast> llc,
+        py::array_t<double, py::array::c_style | py::array::forcecast> urc
+        )
+{
+    std::vector<double> cppCenter(2);
+    std::vector<double> cppLLC(2);
+    std::vector<double> cppURC(2);
+    std::memcpy(cppCenter.data(),center.data(),2*sizeof(double));
+    std::memcpy(cppLLC.data(),llc.data(),2*sizeof(double));
+    std::memcpy(cppURC.data(),urc.data(),2*sizeof(double));
+    bool result = c_do_intersect2(cppCenter,radius,cppLLC,cppURC);
+    return result;
+}
+
+
+// A table with the elements connected to a vertex
 std::vector<int> c_vertex_to_elements(std::vector<int> &faces, int &num_points, int &num_faces)
 {
     std::vector<int> vtoe;
     std::vector<int> nne;
     // assume each vertex has a max. of 20 elements neigh.
-    vtoe.resize(num_points*20);
-    nne.resize(num_points);
-    for(std::size_t ie = 0; ie < num_faces; ie++ ) {
-        for(std::size_t iv =0; iv < 3; iv++ ) {
+    vtoe.resize(num_points*20, -1);
+    nne.resize(num_points, 0);
+    for(std::size_t ie = 0; ie < num_faces; ++ie ) {
+        for(std::size_t iv =0; iv < 3; ++iv ) {
             int nm1 = faces[ie*3+iv];
             vtoe[nm1*20 + nne[nm1]] = ie;
             nne[nm1] += 1;
@@ -26,13 +168,9 @@ std::vector<int> c_vertex_to_elements(std::vector<int> &faces, int &num_points, 
 }
 
 
-
 // ----------------
 // Python interface for vertex_to_elements
 // ----------------
-// (from https://github.com/tdegeus/pybind11_examples/blob/master/04_numpy-2D_cpp-vector/example.cpp)
-
-namespace py = pybind11;
 py::array vertex_to_elements(py::array_t<int, py::array::c_style | py::array::forcecast> faces,
         int num_points, int num_faces)
 {
@@ -72,221 +210,8 @@ py::array vertex_to_elements(py::array_t<int, py::array::c_style | py::array::fo
 
 
 
-
-std::vector<int> c_where_to(std::vector<int>& intersects, std::vector<int> &vtoe, int rank)
-{
-    int num_points = vtoe.size()/20;
-    std::vector<int> whereTo;
-    whereTo.resize(num_points);
-    for(std::size_t i = 0; i < num_points; ++i) {
-        for(std::size_t j = 0; j < 20; ++j) {
-            int nei = vtoe[i*20 + j];
-            if(nei == 0)
-                continue;
-            for(std::size_t k = 0; k < 2; ++k){
-                 int transmit = intersects[2*i + k];
-                 if(transmit == 0){
-                     whereTo[i] = rank - 1;
-                 }
-                 else if(transmit == 1){
-                     whereTo[i] = rank + 1;
-                 }
-            }
-        }
-    }
-    return whereTo;
-}
-
-// ----------------
-// Python interface for c_where_to
-// ----------------
-py::array where_to(
-            py::array_t<int, py::array::c_style | py::array::forcecast> intersects,
-            py::array_t<int, py::array::c_style | py::array::forcecast> vtoe,
-            int rank
-            )
-{
-
-  int num_points = vtoe.size()/20;
-
-  // allocate std::vector (to pass to the C++ function)
-  std::vector<int> cppintersects(num_points*2);
-  std::vector<int> cppvtoe(num_points*20);
-
-  // copy py::array -> std::vector
-  std::memcpy(cppintersects.data(),intersects.data(),num_points*2*sizeof(int));
-  std::memcpy(cppvtoe.data(),vtoe.data(),num_points*20*sizeof(int));
-
-  std::vector<int> whereTo= c_where_to(cppintersects, cppvtoe, rank);
-
-  ssize_t              soint      = sizeof(int);
-  ssize_t              ndim      = 2;
-  std::vector<ssize_t> shape     = {num_points, 1};
-  std::vector<ssize_t> strides   = {soint*1, soint};
-
-  // return 2-D NumPy array
-  return py::array(py::buffer_info(
-    whereTo.data(),                           /* data as contiguous array  */
-    sizeof(int),                          /* size of one scalar        */
-    py::format_descriptor<int>::format(), /* data type                 */
-    2,                                    /* number of dimensions      */
-    shape,                                   /* shape of the matrix       */
-    strides                                  /* strides for each axis     */
-  ));
-}
-
-
-
-
-bool c_do_intersect2(std::vector<double> &c, double &r,
-        std::vector<double> &le, std::vector<double> &re) {
-
-    for(std::size_t i =0; i < 2; i++) {
-        if(c[i] < le[i]){
-            if(c[i] + r < le[i]){
-                return false;
-            }
-        }
-        else if(c[i] > re[i]) {
-            if(c[i] - r > re[i]){
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-
-
-
-// ----------------
-// Python interface for do_intersect2
-// ----------------
-
-bool do_intersect2(
-        py::array_t<double, py::array::c_style | py::array::forcecast> c,
-        double r,
-        py::array_t<double, py::array::c_style | py::array::forcecast> le,
-        py::array_t<double, py::array::c_style | py::array::forcecast> re
-        )
-{
-  // check input dimensions
-  if ( c.ndim() != 1 )
-    throw std::runtime_error("Input should be a 1D NumPy array");
-  if ( le.ndim() != 1 )
-    throw std::runtime_error("Input should be a 1D NumPy array");
-  if ( re.ndim() != 1 )
-    throw std::runtime_error("Input should be 1D NumPy array");
-
-  // allocate std::vector (to pass to the C++ function)
-  std::vector<double> cppC(2);
-  std::vector<double> cppLE(2);
-  std::vector<double> cppRE(2);
-  double cppR;
-
-  // copy py::array -> std::vector
-  std::memcpy(cppLE.data(),re.data(),2*sizeof(double));
-  std::memcpy(cppRE.data(),le.data(),2*sizeof(double));
-  std::memcpy(cppC.data(),c.data(),2*sizeof(double));
-  cppR = r;
-
-  bool do_intersect = c_do_intersect2(cppC, cppR, cppLE, cppRE);
-
-  // return result
-  return do_intersect;
-}
-
-
-
-
-std::vector<int> c_sph_bx_intersect2(std::vector<double> &circumcenters,
-                                    std::vector<double> &radii,
-                                    std::vector<double> &le,
-                                    std::vector<double> &re) {
-
-    int num_circumcenters = radii.size();
-    std::vector<int> intersects;
-    intersects.resize(num_circumcenters*2);
-
-    for(std::size_t i=0; i < num_circumcenters; ++i)
-    {
-        // two neighboring blocks: below and above (in this order)
-        for(std::size_t j=0; j < 2; ++j)
-        {
-            bool do_intersect = true;
-            // loop over dimensions
-            for(std::size_t n =0; n < 2; n++) {
-                if(circumcenters[2*i + n] < le[j*2 + n]){
-                    if((circumcenters[2*i + n] + radii[i]) < le[j*2 + n]){
-                        do_intersect=false;
-                    }
-                }
-                else if(circumcenters[2*i + n] > re[j*2 + n]) {
-                    if((circumcenters[2*i + n] - radii[i]) > re[j*2 + n]){
-                        do_intersect=false;
-                    }
-                }
-            }
-            if(do_intersect) {
-                // 0 for block below
-                // and 1 for block above
-                intersects[i*2 + j] = j;
-                }
-            else {
-                intersects[i*2 + j] = -1;
-            }
-        }
-    }
-    return intersects;
-}
-
-
-// ----------------
-// Python interface for c_sph_bx_intersect2
-// ----------------
-
- py::array sph_bx_intersect2(
-            py::array_t<double, py::array::c_style | py::array::forcecast> circumcenters,
-            py::array_t<double, py::array::c_style | py::array::forcecast> radii,
-            py::array_t<double, py::array::c_style | py::array::forcecast> le,
-            py::array_t<double, py::array::c_style | py::array::forcecast> re)
-{
-  int num_circumcenters = radii.size();
-
-  // allocate std::vector (to pass to the C++ function)
-  std::vector<double> cppCC(2*num_circumcenters);
-  std::vector<double> cppRR(num_circumcenters);
-  std::vector<double> cppLE(4);
-  std::vector<double> cppRE(4);
-
-  // copy py::array -> std::vector
-  std::memcpy(cppRE.data(),re.data(),4*sizeof(double));
-  std::memcpy(cppLE.data(),le.data(),4*sizeof(double));
-  std::memcpy(cppCC.data(),circumcenters.data(),num_circumcenters*2*sizeof(double));
-  std::memcpy(cppRR.data(),radii.data(),num_circumcenters*sizeof(double));
-
-  std::vector<int> intersect = c_sph_bx_intersect2(cppCC, cppRR, cppLE, cppRE);
-
-  ssize_t              soint      = sizeof(int);
-  ssize_t              ndim      = 2;
-  std::vector<ssize_t> shape     = {num_circumcenters, 2};
-  std::vector<ssize_t> strides   = {soint*2, soint};
-
-  // return 2-D NumPy array
-  return py::array(py::buffer_info(
-    intersect.data(),                           /* data as contiguous array  */
-    sizeof(int),                          /* size of one scalar        */
-    py::format_descriptor<int>::format(), /* data type                 */
-    2,                                    /* number of dimensions      */
-    shape,                                   /* shape of the matrix       */
-    strides                                  /* strides for each axis     */
-  ));
-}
-
-
 PYBIND11_MODULE(cpputils, m) {
+    m.def("do_intersect2", &do_intersect2);
+    m.def("where_to2", &where_to2);
     m.def("vertex_to_elements", &vertex_to_elements);
-    m.def("do_intersect", &do_intersect2);
-    m.def("sph_bx_intersect2", &sph_bx_intersect2);
-    m.def("where_to", &where_to);
 }
