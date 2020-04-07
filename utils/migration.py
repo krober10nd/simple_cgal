@@ -21,7 +21,7 @@ def enqueue(blocks, points, faces, rank):
     le = np.array([np.amin(block, axis=0) for block in nei_blocks]).flatten()
     re = np.array([np.amax(block, axis=0) for block in nei_blocks]).flatten()
 
-    # add dummy box if rank==0 or rank=size-1
+    # add dummy box above if rank==0 or under if rank=size-1
     if rank == len(blocks) - 1:
         le = np.append(le, [-9999, -9999])
         re = np.append(re, [-9998, -9998])
@@ -35,3 +35,16 @@ def enqueue(blocks, points, faces, rank):
     exports = np.where(exports == 0, rank - 1, exports)
 
     return exports
+
+
+def migration(comm, rank, exports, points):
+    """
+    Transmit data via MPI
+    """
+    tmp = []
+    for ix, export in enumerate(exports):
+        if export != -1:
+            comm.send(points[ix, :], dest=export, tag=11)
+            tmp = np.append(tmp, comm.recv(source=export, tag=11))
+    new_points = np.reshape(tmp, (int(len(tmp) / 2), 2))
+    return new_points
