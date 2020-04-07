@@ -8,7 +8,6 @@
 
 
 
-
 std::vector<int> c_vertex_to_elements(std::vector<int> &faces, int &num_points, int &num_faces)
 {
     std::vector<int> vtoe;
@@ -71,6 +70,70 @@ py::array vertex_to_elements(py::array_t<int, py::array::c_style | py::array::fo
   ));
 }
 
+
+
+
+std::vector<int> c_where_to(std::vector<int>& intersects, std::vector<int> &vtoe, int rank)
+{
+    int num_points = vtoe.size()/20;
+    std::vector<int> whereTo;
+    whereTo.resize(num_points);
+    for(std::size_t i = 0; i < num_points; ++i) {
+        for(std::size_t j = 0; j < 20; ++j) {
+            int nei = vtoe[i*20 + j];
+            if(nei == 0)
+                continue;
+            for(std::size_t k = 0; k < 2; ++k){
+                 int transmit = intersects[2*i + k];
+                 if(transmit == 0){
+                     whereTo[i] = rank - 1;
+                 }
+                 else if(transmit == 1){
+                     whereTo[i] = rank + 1;
+                 }
+            }
+        }
+    }
+    return whereTo;
+}
+
+// ----------------
+// Python interface for c_where_to
+// ----------------
+py::array where_to(
+            py::array_t<int, py::array::c_style | py::array::forcecast> intersects,
+            py::array_t<int, py::array::c_style | py::array::forcecast> vtoe,
+            int rank
+            )
+{
+
+  int num_points = vtoe.size()/20;
+
+  // allocate std::vector (to pass to the C++ function)
+  std::vector<int> cppintersects(num_points*2);
+  std::vector<int> cppvtoe(num_points*20);
+
+  // copy py::array -> std::vector
+  std::memcpy(cppintersects.data(),intersects.data(),num_points*2*sizeof(int));
+  std::memcpy(cppvtoe.data(),vtoe.data(),num_points*20*sizeof(int));
+
+  std::vector<int> whereTo= c_where_to(cppintersects, cppvtoe, rank);
+
+  ssize_t              soint      = sizeof(int);
+  ssize_t              ndim      = 2;
+  std::vector<ssize_t> shape     = {num_points, 1};
+  std::vector<ssize_t> strides   = {soint*1, soint};
+
+  // return 2-D NumPy array
+  return py::array(py::buffer_info(
+    whereTo.data(),                           /* data as contiguous array  */
+    sizeof(int),                          /* size of one scalar        */
+    py::format_descriptor<int>::format(), /* data type                 */
+    2,                                    /* number of dimensions      */
+    shape,                                   /* shape of the matrix       */
+    strides                                  /* strides for each axis     */
+  ));
+}
 
 
 
@@ -225,4 +288,5 @@ PYBIND11_MODULE(cpputils, m) {
     m.def("vertex_to_elements", &vertex_to_elements);
     m.def("do_intersect", &do_intersect2);
     m.def("sph_bx_intersect2", &sph_bx_intersect2);
+    m.def("where_to", &where_to);
 }
