@@ -18,8 +18,8 @@ typedef K::Circle_2  Circle;
 typedef K::Iso_rectangle_2 Rectangle;
 
 // determine which rank points need to be exported to
-std::vector<int> c_where_to2(std::vector<double> &points, std::vector<int> &faces,
-                             std::vector<double> &llc, std::vector<double> &urc)
+std::vector<double> c_where_to2(std::vector<double> &points, std::vector<int> &faces,
+                             std::vector<double> &llc, std::vector<double> &urc, int rank)
 {
     int num_faces = faces.size()/3;
     int num_points = points.size()/2;
@@ -71,7 +71,34 @@ std::vector<int> c_where_to2(std::vector<double> &points, std::vector<int> &face
             }
         }
     }
-    return exports;
+
+    std::vector<double> pointsToMigrate;
+    pointsToMigrate.resize(num_points*2,-1);
+
+    double kount_below = 0.0;
+    for(std::size_t iv=0; iv < num_points; ++iv)
+    {
+        if(exports[iv]==0)
+        {
+            pointsToMigrate[kount_below*2+2]=points[iv*2];
+            pointsToMigrate[kount_below*2+1+2]=points[iv*2+1];
+            kount_below += 1;
+        }
+    }
+
+    double kount_above = 0.0;
+    for(std::size_t iv=0; iv < num_points; ++iv)
+    {
+        if(exports[iv]==1)
+        {
+            pointsToMigrate[kount_below + kount_above*2+2]=points[iv*2];
+            pointsToMigrate[kount_below + kount_above*2+1+2]=points[iv*2+1];
+            kount_above += 1.0;
+        }
+    }
+    pointsToMigrate[0] = kount_below;
+    pointsToMigrate[1] = kount_above;
+    return pointsToMigrate;
 }
 
 namespace py = pybind11;
@@ -81,7 +108,8 @@ namespace py = pybind11;
 py::array where_to2(py::array_t<double, py::array::c_style | py::array::forcecast> points,
                     py::array_t<int, py::array::c_style | py::array::forcecast> faces,
                     py::array_t<double, py::array::c_style | py::array::forcecast> llc,
-                    py::array_t<double, py::array::c_style | py::array::forcecast> urc
+                    py::array_t<double, py::array::c_style | py::array::forcecast> urc,
+                    int rank
                     )
 {
   int num_faces = faces.size()/3;
@@ -100,18 +128,18 @@ py::array where_to2(py::array_t<double, py::array::c_style | py::array::forcecas
   std::memcpy(cppurc.data(), urc.data(),4*sizeof(double));
 
   // call cpp code
-  std::vector<int> exports = c_where_to2(cpppoints, cppfaces, cppllc, cppurc);
+  std::vector<double> pointsToMigrate = c_where_to2(cpppoints, cppfaces, cppllc, cppurc, rank);
 
-  ssize_t              soint      = sizeof(int);
+  ssize_t              sodble    = sizeof(double);
   ssize_t              ndim      = 2;
-  std::vector<ssize_t> shape     = {num_points, 1};
-  std::vector<ssize_t> strides   = {soint*1, soint};
+  std::vector<ssize_t> shape     = {num_points, 2};
+  std::vector<ssize_t> strides   = {sodble*2, sodble};
 
   // return 2-D NumPy array
   return py::array(py::buffer_info(
-    exports.data(),                           /* data as contiguous array  */
-    sizeof(int),                          /* size of one scalar        */
-    py::format_descriptor<int>::format(), /* data type                 */
+    pointsToMigrate.data(),                /* data as contiguous array  */
+    sizeof(double),                       /* size of one scalar        */
+    py::format_descriptor<double>::format(), /* data type                 */
     2,                                    /* number of dimensions      */
     shape,                                   /* shape of the matrix       */
     strides                                  /* strides for each axis     */

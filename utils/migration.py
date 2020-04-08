@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import cpputils as cutils
 
 """
@@ -29,22 +30,25 @@ def enqueue(blocks, points, faces, rank):
         le = np.insert(le, 0, [-9999, -9999])
         re = np.insert(re, 0, [-9998, -9998])
 
-    exports = cutils.where_to2(points, faces, le, re)
-
-    exports = np.where(exports == 1, rank + 1, exports)
-    exports = np.where(exports == 0, rank - 1, exports)
+    exports = cutils.where_to2(points, faces, le, re, rank)
 
     return exports
 
 
-def migration(comm, rank, exports, points):
+def migration(comm, rank, size, exports):
     """
-    Transmit data via MPI
+    Transmit data via MPI using P2P comm
     """
+    NSB = int(exports[0, 0])
+    NSA = int(exports[0, 1])
+
     tmp = []
-    for ix, export in enumerate(exports):
-        if export != -1:
-            comm.send(points[ix, :], dest=export, tag=11)
-            tmp = np.append(tmp, comm.recv(source=export, tag=11))
+    if NSA != 0:
+        comm.send(exports[1 : NSA + 1, :], dest=rank + 1, tag=11)
+        tmp = np.append(tmp, comm.recv(source=rank + 1, tag=11))
+    if NSB != 0:
+        comm.send(exports[NSA + 1 : NSA + 1 + NSB, :], dest=rank - 1, tag=11)
+        tmp = np.append(tmp, comm.recv(source=rank - 1, tag=11))
+
     new_points = np.reshape(tmp, (int(len(tmp) / 2), 2))
     return new_points
