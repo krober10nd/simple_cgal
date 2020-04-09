@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def blocker(points, nblocks):
+def blocker(points, rank, nblocks):
     """ Decompose point coordinates into # of blocks
         Blocks are orientated parallel to x-axis and have a neighbor
         above and below +-y the block.
@@ -22,13 +22,21 @@ def blocker(points, nblocks):
     dy = (ylims[1] - ylims[0]) / nblocks
 
     blocks = []
+    block_extents = []
     for low_x, low_y in zip(xx.ravel(), yy.ravel()):
         block = points[
             (points[:, 0] >= low_x)
             & (points[:, 0] <= low_x + dx)
-            & (points[:, 1] >= low_y)
-            & (points[:, 1] <= low_y + dy)
+            & (points[:, 1] > low_y)
+            & (points[:, 1] < low_y + dy)
         ]
         if block.shape[0]:
             blocks.append(block)
-    return blocks
+
+    block_extents = []
+    for block in blocks:
+        tmpm = np.amin(block, axis=0)
+        tmpp = np.amax(block, axis=0)
+        block_extents.append([tmpm[0], tmpm[1], tmpp[0], tmpp[1]])
+
+    return blocks[rank], block_extents
