@@ -23,21 +23,15 @@ def remove_external_faces(points, faces, extents):
     Remove faces with all three vertices outside block (external)
     """
     signed_distance = drectangle(
-        points, x1=extents[0], x2=extents[2], y1=extents[1], y2=extents[3]
+        points[faces.flatten(), :],
+        x1=extents[0],
+        x2=extents[2],
+        y1=extents[1],
+        y2=extents[3],
     )
-
-    face_new = []
-    for face in faces:
-        k = 0
-        for vertex in face:
-            d = signed_distance[vertex]
-            if d > 0:
-                k += 1
-        if k != 3:
-            face_new = np.append(face_new, face)
-
-    face_new = np.reshape(face_new, (int(len(face_new) / 3), 3))
-    return face_new
+    isOut = np.reshape(signed_distance > 0, (-1, 3))
+    faces_new = faces[np.sum(isOut, axis=1) != 3, :]
+    return faces_new
 
 
 def vertex_to_elements(faces):
@@ -58,6 +52,7 @@ def vertex_to_elements(faces):
 def calc_circumballs(points, faces):
     """
     Returns the balls that inscribe the triangles defined by points.
+    Calls a pybind11 CPP subroutine in src/delaunay.cpp
 
     points: an ndarray of double,`shape(npoints,ndim)`. Coordinates of the
             input points.
