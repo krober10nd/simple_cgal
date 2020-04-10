@@ -86,7 +86,7 @@ std::vector<double> c_where_to2(std::vector<double> &points, std::vector<int> &f
         {
             pointsToMigrate[kount_below*2+2]=points[iv*2];
             pointsToMigrate[kount_below*2+1+2]=points[iv*2+1];
-            kount_below += 1;
+            kount_below += 1.0;
         }
     }
 
@@ -95,8 +95,8 @@ std::vector<double> c_where_to2(std::vector<double> &points, std::vector<int> &f
     {
         if(exports[iv]==1)
         {
-            pointsToMigrate[kount_below + kount_above*2+2]=points[iv*2];
-            pointsToMigrate[kount_below + kount_above*2+1+2]=points[iv*2+1];
+            pointsToMigrate[kount_below*2 + kount_above*2+2]=points[iv*2];
+            pointsToMigrate[kount_below*2 + kount_above*2+1+2]=points[iv*2+1];
             kount_above += 1.0;
         }
     }

@@ -33,6 +33,7 @@ import matplotlib.collections
 
 if rank == 1:
     fig, ax = plt.subplots()
+    plt.plot(new_points[:, 0], new_points[:, 1], "r.")
     for e in extents:
         rect = matplotlib.patches.Rectangle(
             (e[0], e[1]), e[2] - e[0], e[3] - e[1], edgecolor="r", facecolor="none",
