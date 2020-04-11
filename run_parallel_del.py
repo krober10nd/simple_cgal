@@ -19,12 +19,11 @@ exports = utils.enqueue(extents, points, tria.vertices, rank, size)
 
 new_points = utils.migration(comm, rank, size, exports)
 
-tria.add_points(new_points)
+tria.add_points(new_point, restart=True)
+
+faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
 points = np.append(points, new_points, axis=0)
-
-# this is horribly slow will have to rewrite this
-faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
 
 import matplotlib.pyplot as plt
