@@ -44,13 +44,23 @@ def migration(comm, rank, size, exports):  # points):
     NSA = int(exports[0, 1])
 
     tmp = []
+    # send points below
     if NSB != 0:
+        # all but zero send to their neighbor below
         comm.send(exports[1 : NSB + 1, :], dest=rank - 1, tag=11)
-        tmp = np.append(tmp, comm.recv(source=rank - 1, tag=11))
 
-    if NSA != 0:
-        comm.send(exports[NSB + 1 : NSB + 1 + NSA, :], dest=rank + 1, tag=11)
+    # all but the top receive (no neighbor)
+    if rank != size - 1:
         tmp = np.append(tmp, comm.recv(source=rank + 1, tag=11))
+
+    # send points above
+    if NSA != 0:
+        # all put the top enter
+        comm.send(exports[NSB + 1 : NSB + 1 + NSA, :], dest=rank + 1, tag=11)
+
+    # all but the bottom receive
+    if rank != 0:
+        tmp = np.append(tmp, comm.recv(source=rank - 1, tag=11))
 
     new_points = np.reshape(tmp, (int(len(tmp) / 2), 2))
     return new_points
