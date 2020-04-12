@@ -29,8 +29,6 @@ new_points = utils.migration(comm, rank, size, exports)
 
 tria.add_points(new_points, restart=True)
 
-faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
-
 points, faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
 upoints, ufaces = utils.aggregate(points, faces, comm, size, rank)
