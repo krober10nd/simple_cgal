@@ -1,5 +1,5 @@
 # simple_cgal
-A simple wrapper to perform 2D/3D Delaunay triangulation using CGAL with pybind11 and CMake
+A wrapper to perform 2D/3D Delaunay triangulation using CGAL with pybind11 and CMake. Supports distributed memory parallel Delaunay triangulation using (for now qhull)
 
 # Installation
 1. clone the repo: ```git clone https://github.com/krober10nd/simple_cgal.git```
