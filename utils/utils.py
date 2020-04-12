@@ -1,4 +1,5 @@
 import numpy as np
+from mpi4py import MPI
 
 import simple_cgal as cgal
 import cpputils as cutils
@@ -7,6 +8,95 @@ import cpputils as cutils
 """
 Utilities for the parallel Delaunay algorithm.
 """
+
+
+def unique_rows(A, return_index=False, return_inverse=False):
+    """
+    Similar to MATLAB's unique(A, 'rows'), this returns B, I, J
+    where B is the unique rows of A and I and J satisfy
+    A = B[J,:] and B = A[I,:]
+    Returns I if return_index is True
+    Returns J if return_inverse is True
+    """
+    A = np.require(A, requirements="C")
+    assert A.ndim == 2, "array must be 2-dim'l"
+
+    orig_dtype = A.dtype
+    ncolumns = A.shape[1]
+    dtype = np.dtype((np.character, orig_dtype.itemsize * ncolumns))
+    B, I, J = np.unique(A.view(dtype), return_index=True, return_inverse=True)
+
+    B = B.view(orig_dtype).reshape((-1, ncolumns), order="C")
+
+    # There must be a better way to do this:
+    if return_index:
+        if return_inverse:
+            return B, I, J
+        else:
+            return B, I
+    else:
+        if return_inverse:
+            return B, J
+        else:
+            return B
+
+
+def fixmesh(p, t, ptol=2e-13):
+    """Remove duplicated/unused nodes
+    Parameters
+    ----------
+    p : array, shape (np, dim)
+    t : array, shape (nt, nf)
+    Usage
+    -----
+    p, t = fixmesh(p, t, ptol)
+    """
+    snap = (p.max(0) - p.min(0)).max() * ptol
+    _, ix, jx = unique_rows(np.round(p / snap) * snap, True, True)
+
+    p = p[ix]
+    t = jx[t]
+
+    return p, t
+
+
+def aggregate(points, faces, comm, size, rank):
+    """
+    Collect global triangulation onto rank 0
+    """
+    soff_p = np.zeros((size), dtype=int)
+    soff_t = np.zeros((size), dtype=int)
+
+    soff_p[rank] = len(points)
+    soff_t[rank] = len(faces)
+
+    off_p = np.zeros((size), dtype=int)
+    off_t = np.zeros((size), dtype=int)
+
+    comm.Reduce(soff_p, off_p, op=MPI.SUM, root=0)
+    comm.Reduce(soff_t, off_t, op=MPI.SUM, root=0)
+
+    if rank == 0:
+        csum_t = np.cumsum(off_t)
+        csum_p = np.cumsum(off_p)
+        gpoints = points
+        gfaces = faces
+    for r in np.arange(1, size):
+        if rank == r:
+            comm.send(points, dest=0, tag=12)
+            comm.send(faces, dest=0, tag=13)
+        if rank == 0:
+            tmp = np.reshape(comm.recv(source=r, tag=12), (off_p[r], 2))
+            tmp2 = (
+                np.reshape(comm.recv(source=r, tag=13), (off_t[r], 3)) + csum_p[r - 1]
+            )
+            gpoints = np.append(gpoints, tmp, axis=0)
+            gfaces = np.append(gfaces, tmp2, axis=0)
+    if rank == 0:
+        upoints, ufaces = fixmesh(gpoints, gfaces)
+        return upoints, ufaces
+    else:
+        return True, True
 
 
 def drectangle(p, x1, x2, y1, y2):
@@ -29,9 +119,13 @@ def remove_external_faces(points, faces, extents):
         y1=extents[1],
         y2=extents[3],
     )
-    isOut = np.reshape(signed_distance > 0, (-1, 3))
+    isOut = np.reshape(signed_distance >= 0, (-1, 3))
     faces_new = faces[np.sum(isOut, axis=1) != 3, :]
-    return faces_new
+    points_new, faces_new = fixmesh(points, faces_new)
+    # pix, _, jx1 = np.unique(faces_new.flatten(), return_index=True, return_inverse=True)
+    # faces_new = np.reshape(jx1, (faces_new.shape))
+    # points_new = points[pix, :]
+    return points_new, faces_new
 
 
 def vertex_to_elements(faces):

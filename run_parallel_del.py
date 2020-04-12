@@ -1,5 +1,7 @@
-from mpi4py import MPI
+import time
+
 import numpy as np
+from mpi4py import MPI
 from scipy.spatial import Delaunay
 
 import utils
@@ -8,8 +10,14 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 
+np.random.seed(0)
+gpoints = np.random.random((1000000, 2))
+# gpoints = np.loadtxt("points.out", delimiter=",")
 
-gpoints = np.loadtxt("points.out", delimiter=",")
+if rank == 0:
+    print("read it in", flush=True)
+
+t1 = time.time()
 
 points, extents = utils.blocker(points=gpoints, rank=rank, nblocks=size)
 
@@ -19,34 +27,14 @@ exports = utils.enqueue(extents, points, tria.vertices, rank, size)
 
 new_points = utils.migration(comm, rank, size, exports)
 
-tria.add_points(new_points)
+tria.add_points(new_points, restart=True)
 
-points = np.append(points, new_points, axis=0)
+points, faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
-# this is horribly slow will have to rewrite this
-faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
+upoints, ufaces = utils.aggregate(points, faces, comm, size, rank)
 
-
-import matplotlib.pyplot as plt
-import matplotlib
-import matplotlib.collections
-
-if rank == 1:
-    fig, ax = plt.subplots()
-    plt.plot(new_points[:, 0], new_points[:, 1], "r.")
-    for e in extents:
-        rect = matplotlib.patches.Rectangle(
-            (e[0], e[1]), e[2] - e[0], e[3] - e[1], edgecolor="r", facecolor="none",
-        )
-        ax.add_patch(rect)
-
-    plt.triplot(points[:, 0], points[:, 1], faces)
-
-    # patches = [plt.Circle(center, size, fill=None) for center, size in zip(cc, rr)]
-    # coll = matplotlib.collections.PatchCollection(patches, match_original=True,)
-    # ax.add_collection(coll)
-
-    # ax.set_xlim([-11000, -8700])
-    # ax.set_ylim([32500, 34600])
-    ax.axis("equal")
-    plt.show()
+comm.barrier()
+if rank == 0:
+    print("finished in " + str(time.time() - t1))
+    np.savetxt("faces" + str(rank), ufaces)
+    np.savetxt("points" + str(rank), upoints)

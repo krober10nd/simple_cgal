@@ -1,6 +1,7 @@
 from .blocker import blocker
 from .migration import enqueue, migration
 from .utils import (
+    aggregate,
     are_finite,
     on_hull,
     in_hull,
@@ -11,6 +12,7 @@ from .utils import (
 )
 
 __all__ = [
+    "aggregate",
     "remove_external_faces",
     "are_finite",
     "on_hull",
