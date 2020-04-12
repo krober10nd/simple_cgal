@@ -18,6 +18,7 @@ A wrapper to perform 2D/3D serial and distributed memory parallel Delaunay trian
 
 # How does it work?
 
+In serial....
 ```python
  import random
  
@@ -37,4 +38,6 @@ A wrapper to perform 2D/3D serial and distributed memory parallel Delaunay trian
  plt.triplot(points[:,0], points[:,1], faces)
  plt.show()
 ```
+
+For parallel see `examples/example2d_parallel.py`
 
