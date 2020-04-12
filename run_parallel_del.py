@@ -31,23 +31,6 @@ tria.add_points(new_points, restart=True)
 
 faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
-points = np.append(points, new_points, axis=0)
-
-
-import matplotlib.pyplot as plt
-import matplotlib
-import matplotlib.collections
-
-if rank == 1:
-    fig, ax = plt.subplots()
-    plt.plot(new_points[:, 0], new_points[:, 1], "r.")
-    for e in extents:
-        rect = matplotlib.patches.Rectangle(
-            (e[0], e[1]), e[2] - e[0], e[3] - e[1], edgecolor="r", facecolor="none",
-        )
-        ax.add_patch(rect)
->>>>>>> ce77101757c8825e7a6e0ed5800dd42f8dd33526
-
 points, faces = utils.remove_external_faces(tria.points, tria.vertices, extents[rank])
 
 upoints, ufaces = utils.aggregate(points, faces, comm, size, rank)
