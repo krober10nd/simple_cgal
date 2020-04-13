@@ -1,10 +1,51 @@
 import numpy as np
-import utils
+from mpi4py import MPI
 import cpputils as cutils
+
+import utils
 
 """
 Migration routines for moving points during parallel Delaunay
 """
+
+
+def aggregate(points, faces, comm, size, rank):
+    """
+    Collect global triangulation onto rank 0
+    """
+    soff_p = np.zeros((size), dtype=int)
+    soff_t = np.zeros((size), dtype=int)
+
+    soff_p[rank] = len(points)
+    soff_t[rank] = len(faces)
+
+    off_p = np.zeros((size), dtype=int)
+    off_t = np.zeros((size), dtype=int)
+
+    comm.Reduce(soff_p, off_p, op=MPI.SUM, root=0)
+    comm.Reduce(soff_t, off_t, op=MPI.SUM, root=0)
+
+    if rank == 0:
+        csum_t = np.cumsum(off_t)
+        csum_p = np.cumsum(off_p)
+        gpoints = points
+        gfaces = faces
+    for r in np.arange(1, size):
+        if rank == r:
+            comm.send(points, dest=0, tag=12)
+            comm.send(faces, dest=0, tag=13)
+        if rank == 0:
+            tmp = np.reshape(comm.recv(source=r, tag=12), (off_p[r], 2))
+            tmp2 = (
+                np.reshape(comm.recv(source=r, tag=13), (off_t[r], 3)) + csum_p[r - 1]
+            )
+            gpoints = np.append(gpoints, tmp, axis=0)
+            gfaces = np.append(gfaces, tmp2, axis=0)
+    if rank == 0:
+        upoints, ufaces = utils.fixmesh(gpoints, gfaces)
+        return upoints, ufaces
+    else:
+        return True, True
 
 
 def enqueue(extents, points, faces, rank, size):

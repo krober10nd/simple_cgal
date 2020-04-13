@@ -1,7 +1,7 @@
 from .blocker import blocker
-from .migration import enqueue, migration
+from .migration import enqueue, migration, aggregate
 from .utils import (
-    aggregate,
+    fixmesh,
     are_finite,
     on_hull,
     in_hull,
@@ -12,6 +12,7 @@ from .utils import (
 )
 
 __all__ = [
+    "fixmesh",
     "aggregate",
     "remove_external_faces",
     "are_finite",
