@@ -4,10 +4,11 @@ import sys
 import platform
 import subprocess
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+files = ["*.so*"]
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=""):
@@ -77,6 +78,9 @@ setup(
     author_email="keithrbt0gmail.com",
     description="A simple wrapper to perform delaunay in cgal with pybind11 and CMake",
     long_description="",
+    packages=find_packages(),
+    package_data={"simple_cgal": files},
+    include_package_data=True,
     ext_modules=[CMakeExtension("simple_cgal")],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
