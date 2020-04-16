@@ -1,6 +1,4 @@
 import numpy as np
-import time
-from scipy.spatial import Delaunay
 
 import simple_cgal as cgal
 import cpputils as cutils
@@ -61,8 +59,6 @@ def fixmesh(p, t, ptol=2e-13):
     return p, t
 
 
-
-
 def drectangle(p, x1, x2, y1, y2):
     min = np.minimum
     """Signed distance function for rectangle with corners (x1,y1), (x2,y1),
@@ -83,12 +79,9 @@ def remove_external_faces(points, faces, extents):
         y1=extents[1],
         y2=extents[3],
     )
-    isOut = np.reshape(signed_distance > -1e-13, (-1, 3))
+    isOut = np.reshape(signed_distance > 0, (-1, 3))
     faces_new = faces[np.sum(isOut, axis=1) != 3, :]
     points_new, faces_new = fixmesh(points, faces_new)
-    # pix, _, jx1 = np.unique(faces_new.flatten(), return_index=True, return_inverse=True)
-    # faces_new = np.reshape(jx1, (faces_new.shape))
-    # points_new = points[pix, :]
     return points_new, faces_new
 
 

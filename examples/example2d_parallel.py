@@ -8,7 +8,8 @@ import utils
 
 num_points = 250000
 np.random.seed(0)
-gpoints = np.random.random(size=(num_points, 2))
+gpoints = np.random.uniform(size=(num_points, 2), low=0.0, high=1.0)
+bbox = (0.0, 0.0, 1.0, 1.0)
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
@@ -16,7 +17,7 @@ rank = comm.Get_rank()
 
 t1 = time.time()
 
-points, extents = utils.blocker(points=gpoints, rank=rank, nblocks=size)
+points, extents = utils.blocker(points=gpoints, rank=rank, nblocks=size, bbox=bbox)
 
 tria = SciPyDelaunay(points, incremental=True)
 
@@ -33,7 +34,8 @@ upoints, ufaces = utils.aggregate(points, faces, comm, size, rank)
 comm.barrier()
 if rank == 0:
     print("elapsed time is " + str(time.time() - t1), flush=True)
-#    print(ufaces.shape)
-#    print(ufaces[:5, :])
-#    plt.triplot(upoints[:, 0], upoints[:, 1], ufaces)
-#    plt.show()
+    print(upoints.shape)
+    print(ufaces.shape)
+    print(ufaces[:5, :])
+    plt.triplot(upoints[:, 0], upoints[:, 1], ufaces)
+    plt.show()
