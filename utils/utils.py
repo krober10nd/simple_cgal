@@ -88,19 +88,25 @@ def remove_external_faces(points, faces, extents):
     return points_new, faces_new
 
 
-def vertex_to_elements(faces):
+def vertex_to_elements(points, faces):
     """
-    Returns the elements incident to a vertex in the
-    Delaunay graph. Calls a pybind11 CPP subroutine in src/cpputils.cpp
-
-    faces: an ndarray of int, `(ndarray of ints, shape (nsimplex, ndim+1)`.
-            Indices of the points forming the simplices in the triangulation.
+    Determine which elements connected to vertices
     """
-    num_points = np.amax(faces) + 1
     num_faces = len(faces)
-    vtoe = cutils.vertex_to_elements(faces, num_points, num_faces)
-    nne = np.count_nonzero(vtoe > -1, axis=1)
-    return vtoe, nne
+
+    ext = np.tile(np.arange(0, num_faces), (3, 1)).reshape(-1, order="F")
+    ve = np.reshape(faces, (-1,))
+    ve = np.vstack((ve, ext)).T
+    ve = ve[ve[:, 0].argsort(), :]
+
+    idx = np.insert(np.diff(ve[:, 0]), 0, 0)
+    vtoe_pointer = np.argwhere(idx)
+    vtoe_pointer = np.insert(vtoe_pointer, 0, 0)
+    vtoe_pointer = np.append(vtoe_pointer, num_faces * 3)
+
+    vtoe = ve[:, 1]
+
+    return vtoe, vtoe_pointer
 
 
 def calc_circumballs(points, faces):
